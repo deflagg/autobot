@@ -13,6 +13,12 @@ export const ConfigSchema = z.object({
   repoPath: z.string(),
   ws: z.object({ port: z.number() }),
   auth: z.object({ token: z.string() }),
+  safety: z
+    .object({
+      allowlist: z.array(z.string()).optional(),
+      denylist: z.array(z.string()).optional(),
+    })
+    .optional(),
   oauth: z
     .object({
       clientId: z.string().optional(),
@@ -32,6 +38,9 @@ export const CONFIG_DEFAULTS: AutobotConfig = {
   repoPath: process.cwd(),
   ws: { port: 18790 },
   auth: { token: 'dev-token' },
+  safety: {
+    denylist: ['.git/**', '.env', '*.pem', '*.key', '**/*token*', '**/*credentials*'],
+  },
   oauth: {
     authorizeUrl: 'https://auth.openai.com/oauth/authorize',
     tokenUrl: 'https://auth.openai.com/oauth/token',
@@ -61,6 +70,7 @@ export function loadConfig(): AutobotConfig {
     ...parsed,
     ws: { ...CONFIG_DEFAULTS.ws, ...(parsed.ws || {}) },
     auth: { ...CONFIG_DEFAULTS.auth, ...(parsed.auth || {}) },
+    safety: { ...CONFIG_DEFAULTS.safety, ...(parsed.safety || {}) },
     oauth: { ...CONFIG_DEFAULTS.oauth, ...(parsed.oauth || {}) },
   };
   return ConfigSchema.parse(merged);

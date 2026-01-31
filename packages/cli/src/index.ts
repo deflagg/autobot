@@ -2,6 +2,7 @@
 import WebSocket from 'ws';
 import { loadConfig } from '@autobot/core';
 import { execSync } from 'node:child_process';
+import { createInterface } from 'node:readline';
 
 const cfg = loadConfig();
 const url = `ws://127.0.0.1:${cfg.ws.port}`;
@@ -46,6 +47,8 @@ if (args[0] === 'daemon' || args[0] === 'service') {
 
 const ws = new WebSocket(url);
 const id = String(Date.now());
+let chatCounter = 0;
+const chatMode = args[0] === 'chat';
 
 ws.on('open', () => {
   send(ws, { id: `${id}-auth`, type: 'auth', payload: { token: cfg.auth.token } });
@@ -54,6 +57,26 @@ ws.on('open', () => {
 ws.on('message', (data: WebSocket.RawData) => {
   const msg = JSON.parse(String(data));
   if (msg.type === 'auth.ok') {
+    if (chatMode) {
+      const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: 'autobot> ' });
+      rl.prompt();
+      rl.on('line', (line) => {
+        const text = line.trim();
+        if (!text) {
+          rl.prompt();
+          return;
+        }
+        if (text === 'exit' || text === 'quit') {
+          rl.close();
+          ws.close();
+          return;
+        }
+        const reqId = `${Date.now()}-${chatCounter++}`;
+        send(ws, { id: reqId, type: 'update.create', payload: { goal: text } });
+        rl.prompt();
+      });
+      return;
+    }
     if (args[0] === 'auth' && args[1] === 'login') {
       const providerId = getProviderId(args) || 'openai-codex-oauth';
       send(ws, { id, type: 'auth.login.start', payload: { providerId } });
@@ -173,7 +196,7 @@ ws.on('message', (data: WebSocket.RawData) => {
 
   if (msg.type === 'update.created') {
     console.log(JSON.stringify(msg.payload, null, 2));
-    ws.close();
+    if (!chatMode) ws.close();
     return;
   }
 

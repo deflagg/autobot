@@ -37,7 +37,7 @@ Then run:
 autobot auth login
 ```
 
-Note: only one login can be in-flight at a time. If a login is already running, the daemon will reuse the existing session.
+Note: only one login can be in-flight at a time. The daemon will reuse the existing session if a login is already running.
 
 Check status:
 ```bash
@@ -48,6 +48,24 @@ Run doctor checks:
 ```bash
 autobot doctor
 ```
+
+Chat loop:
+```bash
+autobot chat
+```
+(Type a goal per line; `exit` to quit.)
+
+Safety config (optional):
+```json
+{
+  "safety": {
+    "allowlist": ["src/**", "packages/**"],
+    "denylist": [".git/**", ".env", "**/*token*", "**/*credentials*"]
+  }
+}
+```
+
+Daemon PID lock: the daemon writes `~/.autobot/daemon.pid` and refuses to start if a daemon is already running.
 
 ## Design docs
 - [v0.1 Spec](docs/V0_1_SPEC.md)

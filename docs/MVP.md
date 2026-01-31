@@ -78,6 +78,17 @@ Output artifacts:
 - Require clean git tree unless explicit `--autostash`.
 - If verify fails: do not commit; mark update failed; provide rollback guidance.
 
+### Safety config (optional)
+Add to `~/.autobot/config.json`:
+```json
+{
+  "safety": {
+    "allowlist": ["src/**", "packages/**"],
+    "denylist": [".git/**", ".env", "**/*token*", "**/*credentials*"]
+  }
+}
+```
+
 ## Verification (required)
 During apply, daemon runs from repo root:
 - `npm test`

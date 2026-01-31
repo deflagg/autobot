@@ -18,6 +18,7 @@ import {
   updateDir,
   updatesDir,
   ensureCleanTree,
+  ensurePatchPathsAllowed,
   appendAudit,
   DEFAULT_PROVIDER_ID,
   isProviderId,
@@ -158,6 +159,8 @@ export function startDaemon() {
           const dir = updateDir(cfg.repoPath, updateId);
           const patchPath = join(dir, 'patch.diff');
           const patchText = readFileSync(patchPath, 'utf8');
+
+          ensurePatchPathsAllowed(cfg.repoPath, patchText, cfg.safety?.allowlist, cfg.safety?.denylist);
 
           await git.applyPatch(patchText);
           await execa('npm', ['run', 'build'], { cwd: cfg.repoPath, stdio: 'inherit' });
@@ -423,6 +426,8 @@ export function startDaemon() {
           const dir = updateDir(cfg.repoPath, updateApply.data.payload.updateId);
           const patchPath = join(dir, 'patch.diff');
           const patch = readFileSync(patchPath, 'utf8');
+
+          ensurePatchPathsAllowed(cfg.repoPath, patch, cfg.safety?.allowlist, cfg.safety?.denylist);
 
           await git.applyPatch(patch);
           await execa('npm', ['run', 'build'], { cwd: cfg.repoPath, stdio: 'inherit' });

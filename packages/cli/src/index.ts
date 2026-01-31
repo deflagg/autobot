@@ -7,6 +7,12 @@ const cfg = loadConfig();
 const url = `ws://127.0.0.1:${cfg.ws.port}`;
 const args = process.argv.slice(2);
 
+function getProviderId(argv: string[]) {
+  const idx = argv.findIndex((arg) => arg === '--provider' || arg === '-p');
+  if (idx !== -1 && argv[idx + 1]) return argv[idx + 1];
+  return undefined;
+}
+
 function send(ws: WebSocket, msg: any) {
   ws.send(JSON.stringify(msg));
 }
@@ -49,11 +55,38 @@ ws.on('message', (data: WebSocket.RawData) => {
   const msg = JSON.parse(String(data));
   if (msg.type === 'auth.ok') {
     if (args[0] === 'auth' && args[1] === 'login') {
-      send(ws, { id, type: 'auth.login.start' });
+      const providerId = getProviderId(args) || 'openai-codex-oauth';
+      send(ws, { id, type: 'auth.login.start', payload: { providerId } });
       return;
     }
     if (args[0] === 'auth' && args[1] === 'status') {
-      send(ws, { id, type: 'auth.status.get' });
+      const providerId = getProviderId(args) || 'openai-codex-oauth';
+      send(ws, { id, type: 'auth.status.get', payload: { providerId } });
+      return;
+    }
+    if (args[0] === 'auth' && args[1] === 'complete') {
+      const providerId = getProviderId(args) || 'openai-codex-oauth';
+      const first = args[2];
+      const second = args[3];
+      if (!first) {
+        console.error('Usage: autobot auth complete <redirect-url> | <code> <state>');
+        ws.close();
+        return;
+      }
+      if (first.startsWith('http')) {
+        send(ws, { id, type: 'auth.login.complete', payload: { providerId, redirectUrl: first } });
+        return;
+      }
+      if (!second) {
+        console.error('Usage: autobot auth complete <redirect-url> | <code> <state>');
+        ws.close();
+        return;
+      }
+      send(ws, { id, type: 'auth.login.complete', payload: { providerId, code: first, state: second } });
+      return;
+    }
+    if (args[0] === 'doctor') {
+      send(ws, { id, type: 'doctor.run' });
       return;
     }
     if (args[0] === 'update') {
@@ -122,12 +155,18 @@ ws.on('message', (data: WebSocket.RawData) => {
       console.log('Open this URL to authenticate:');
       console.log(authUrl);
     }
-    ws.close();
+    // keep socket open and wait for auth.login.completed
     return;
   }
 
   if (msg.type === 'auth.status.result') {
     console.log(JSON.stringify(msg.payload, null, 2));
+    ws.close();
+    return;
+  }
+
+  if (msg.type === 'auth.login.completed') {
+    console.log('OAuth login completed.');
     ws.close();
     return;
   }
@@ -155,6 +194,12 @@ ws.on('message', (data: WebSocket.RawData) => {
     if (msg.type === 'loop.started' || msg.type === 'loop.status.result') {
       ws.close();
     }
+    return;
+  }
+
+  if (msg.type === 'doctor.result') {
+    console.log(JSON.stringify(msg.payload, null, 2));
+    ws.close();
     return;
   }
 

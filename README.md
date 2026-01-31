@@ -14,7 +14,40 @@ A from-scratch, rethink-first personal automation agent.
 - `LOG.md` — chronological progress log
 
 ## Getting started
-TBD.
+
+### OAuth configuration (required)
+Optional override in `~/.autobot/config.json` (defaults are built-in):
+
+```json
+{
+  "oauth": {
+    "clientId": "<override-only>",
+    "authorizeUrl": "https://auth.openai.com/oauth/authorize",
+    "tokenUrl": "https://auth.openai.com/oauth/token",
+    "redirectHost": "127.0.0.1",
+    "redirectPort": 1455,
+    "redirectPath": "/auth/callback",
+    "scopes": "openid profile email offline_access"
+  }
+}
+```
+
+Then run:
+```bash
+autobot auth login
+```
+
+Note: only one login can be in-flight at a time. If a login is already running, the daemon will reuse the existing session.
+
+Check status:
+```bash
+autobot auth status
+```
+
+Run doctor checks:
+```bash
+autobot doctor
+```
 
 ## Design docs
 - [v0.1 Spec](docs/V0_1_SPEC.md)

@@ -34,12 +34,50 @@ export const StatusResultSchema = EnvelopeSchema.extend({
   }),
 });
 
+export const DoctorRunSchema = EnvelopeSchema.extend({
+  type: z.literal('doctor.run'),
+});
+
+export const DoctorResultSchema = EnvelopeSchema.extend({
+  type: z.literal('doctor.result'),
+  ok: z.literal(true),
+  payload: z.object({
+    checks: z.array(
+      z.object({
+        name: z.string(),
+        ok: z.boolean(),
+        message: z.string().optional(),
+      })
+    ),
+  }),
+});
+
 export const AuthLoginStartSchema = EnvelopeSchema.extend({
   type: z.literal('auth.login.start'),
+  payload: z
+    .object({
+      providerId: z.string().optional(),
+    })
+    .optional(),
 });
 
 export const AuthStatusGetSchema = EnvelopeSchema.extend({
   type: z.literal('auth.status.get'),
+  payload: z
+    .object({
+      providerId: z.string().optional(),
+    })
+    .optional(),
+});
+
+export const AuthLoginCompleteSchema = EnvelopeSchema.extend({
+  type: z.literal('auth.login.complete'),
+  payload: z.object({
+    providerId: z.string().optional(),
+    code: z.string().optional(),
+    state: z.string().optional(),
+    redirectUrl: z.string().optional(),
+  }),
 });
 
 export const UpdateCreateSchema = EnvelopeSchema.extend({

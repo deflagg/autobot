@@ -9,5 +9,9 @@
     "test": "echo 'no tests'",
     "lint": "echo 'no lint'",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "ulid": "^3.0.2",
+    "zod": "^3.24.1"
   }
 }

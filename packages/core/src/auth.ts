@@ -9,6 +9,7 @@ export type OAuthTokens = {
   token_type?: string;
   scope?: string;
   obtained_at?: number; // unix ms
+  expires_at?: number; // unix ms
 };
 
 export function credentialsDir(): string {
@@ -33,4 +34,11 @@ export function saveOAuthTokens(tokens: OAuthTokens): void {
 
 export function isRefreshable(tokens: OAuthTokens | null): boolean {
   return !!tokens?.refresh_token;
+}
+
+export function isExpired(tokens: OAuthTokens | null, skewSeconds = 60): boolean {
+  if (!tokens?.expires_in) return false;
+  const obtainedAt = tokens.obtained_at ?? 0;
+  const expiresAt = obtainedAt + tokens.expires_in * 1000;
+  return Date.now() >= expiresAt - skewSeconds * 1000;
 }

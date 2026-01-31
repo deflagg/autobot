@@ -59,6 +59,14 @@ Must include:
 - `auth.token` (generated on install)
 - safety limits (max files/LOC), denylist patterns
 - verification commands (`npm test`, `npm run build`)
+- OAuth config (override-only, defaults built-in):
+  - `oauth.clientId`
+  - `oauth.authorizeUrl`
+  - `oauth.tokenUrl`
+  - `oauth.redirectHost`
+  - `oauth.redirectPort`
+  - `oauth.redirectPath`
+  - `oauth.scopes`
 
 Credentials stored at:
 - `~/.autobot/credentials/openai-codex.oauth.json` (chmod 600)

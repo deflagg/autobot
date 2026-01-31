@@ -2,7 +2,9 @@ import { WebSocketServer } from 'ws';
 import {
   EnvelopeSchema,
   StatusGetSchema,
+  DoctorRunSchema,
   AuthLoginStartSchema,
+  AuthLoginCompleteSchema,
   AuthStatusGetSchema,
   UpdateCreateSchema,
   UpdateApplySchema,
@@ -13,19 +15,19 @@ import {
 } from '@autobot/protocol';
 import {
   loadConfig,
-  loadOAuthTokens,
-  saveOAuthTokens,
-  isRefreshable,
   updateDir,
   updatesDir,
   ensureCleanTree,
   appendAudit,
-  getOpenClawClientId,
+  DEFAULT_PROVIDER_ID,
+  isProviderId,
 } from '@autobot/core';
-import { createServer } from 'node:http';
-import { randomBytes, createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import type { AuthProvider } from '@autobot/core';
+import { stateDir } from '@autobot/core';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { ulid } from 'ulid';
+import { createOpenAICodexOAuthProvider } from './providers/openaiCodexOAuth.js';
 import { join } from 'node:path';
 import { simpleGit } from 'simple-git';
 import { execa } from 'execa';
@@ -46,20 +48,6 @@ type LoopState = {
 };
 
 let loopState: LoopState | null = null;
-
-function base64url(input: Buffer) {
-  return input
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-function generatePKCE() {
-  const verifier = base64url(randomBytes(32));
-  const challenge = base64url(createHash('sha256').update(verifier).digest());
-  return { verifier, challenge, method: 'S256' as const };
-}
 
 async function createUpdateArtifacts(repoPath: string, goal: string) {
   const updateId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${ulid()}`;
@@ -84,6 +72,50 @@ function hash(str: string) {
 
 export function startDaemon() {
   const cfg = loadConfig();
+
+  const pidPath = join(stateDir(), 'daemon.pid');
+  mkdirSync(stateDir(), { recursive: true });
+  if (existsSync(pidPath)) {
+    const existing = Number(readFileSync(pidPath, 'utf8'));
+    if (existing) {
+      try {
+        process.kill(existing, 0);
+        throw new Error(`Daemon already running (pid ${existing}). Stop it before starting a new one.`);
+      } catch {
+        // stale pid, continue
+      }
+    }
+  }
+  writeFileSync(pidPath, String(process.pid));
+  const cleanup = () => {
+    try { unlinkSync(pidPath); } catch {}
+  };
+  process.on('exit', cleanup);
+  process.on('SIGINT', () => { cleanup(); process.exit(0); });
+  process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+
+  const loginWaiters = new Map<string, Set<import('ws').WebSocket>>();
+  const providers: Record<string, AuthProvider> = {
+    [DEFAULT_PROVIDER_ID]: createOpenAICodexOAuthProvider(cfg, {
+      onLoginComplete: () => {
+        const waiters = loginWaiters.get(DEFAULT_PROVIDER_ID);
+        if (!waiters) return;
+        for (const client of waiters) {
+          try {
+            client.send(JSON.stringify({
+              id: 'auth.login.completed',
+              type: 'auth.login.completed',
+              ok: true,
+              payload: { providerId: DEFAULT_PROVIDER_ID },
+            }));
+          } catch {
+            // ignore
+          }
+        }
+        waiters.clear();
+      },
+    }),
+  };
   const wss = new WebSocketServer({ host: '127.0.0.1', port: cfg.ws.port });
   const git = simpleGit(cfg.repoPath);
 
@@ -176,6 +208,12 @@ export function startDaemon() {
   wss.on('connection', (ws: import('ws').WebSocket) => {
     let authed = false;
 
+    ws.on('close', () => {
+      for (const waiters of loginWaiters.values()) {
+        waiters.delete(ws);
+      }
+    });
+
     ws.on('message', async (data: import('ws').RawData) => {
       let msg: unknown;
       try {
@@ -222,17 +260,61 @@ export function startDaemon() {
 
       const authStatusGet = AuthStatusGetSchema.safeParse(msg);
       if (authStatusGet.success) {
-        const tokens = loadOAuthTokens();
+        const providerId = authStatusGet.data.payload?.providerId ?? DEFAULT_PROVIDER_ID;
+        if (!isProviderId(providerId)) {
+          ws.send(JSON.stringify({
+            id: authStatusGet.data.id,
+            type: 'error',
+            ok: false,
+            error: { code: 'PROVIDER_NOT_FOUND', message: `Unknown provider: ${providerId}` },
+          }));
+          return;
+        }
+
+        const status = await providers[providerId].getStatus();
+
         ws.send(
           JSON.stringify({
             id: authStatusGet.data.id,
             type: 'auth.status.result',
             ok: true,
-            payload: {
-              provider: 'openai-codex',
-              configured: !!tokens,
-              refreshable: isRefreshable(tokens),
-            },
+            payload: status,
+          })
+        );
+        return;
+      }
+
+      const doctorRun = DoctorRunSchema.safeParse(msg);
+      if (doctorRun.success) {
+        const checks: { name: string; ok: boolean; message?: string }[] = [];
+        const providerId = DEFAULT_PROVIDER_ID;
+        if (!isProviderId(providerId)) {
+          checks.push({ name: 'oauth.provider', ok: false, message: `Unknown provider: ${providerId}` });
+        } else {
+          checks.push({ name: 'oauth.provider', ok: true });
+          const status = await providers[providerId].getStatus();
+          checks.push({ name: 'oauth.configured', ok: status.configured, message: status.configured ? undefined : 'No tokens found. Run autobot auth login.' });
+          if (typeof status.refreshable === 'boolean') {
+            checks.push({ name: 'oauth.refreshable', ok: status.refreshable, message: status.refreshable ? undefined : 'No refresh token present' });
+          }
+          if (typeof status.expired === 'boolean') {
+            checks.push({ name: 'oauth.expired', ok: !status.expired, message: status.expired ? 'Token expired or near expiry' : undefined });
+          }
+        }
+
+        try {
+          const status = await git.status();
+          checks.push({ name: 'git.clean', ok: status.isClean() });
+        } catch (e: any) {
+          checks.push({ name: 'git.clean', ok: false, message: String(e?.message || e) });
+        }
+
+        ws.send(
+          JSON.stringify({
+            id: doctorRun.data.id,
+            type: 'doctor.result',
+            ok: true,
+            payload: { checks },
           })
         );
         return;
@@ -240,100 +322,83 @@ export function startDaemon() {
 
       const authLoginStart = AuthLoginStartSchema.safeParse(msg);
       if (authLoginStart.success) {
-        const pkce = generatePKCE();
-        const state = base64url(randomBytes(16));
-        const redirectPort = cfg.oauth?.redirectPort ?? 7777;
-        const callbackUrl = `http://127.0.0.1:${redirectPort}/oauth/callback`;
-        const authorizeUrl = cfg.oauth?.authorizeUrl || 'https://auth.openai.com/authorize';
-        const clientId = cfg.oauth?.clientId || getOpenClawClientId() || '';
-
-        if (!clientId) {
+        const providerId = authLoginStart.data.payload?.providerId ?? DEFAULT_PROVIDER_ID;
+        if (!isProviderId(providerId)) {
           ws.send(JSON.stringify({
             id: authLoginStart.data.id,
             type: 'error',
             ok: false,
-            error: { code: 'OAUTH_CLIENT_ID_MISSING', message: 'OAuth client id not found; set oauth.clientId or install OpenClaw OAuth' },
+            error: { code: 'PROVIDER_NOT_FOUND', message: `Unknown provider: ${providerId}` },
           }));
           return;
         }
 
-        const server = createServer(async (req, res) => {
-          if (!req.url) return;
-          const url = new URL(req.url, callbackUrl);
-          if (url.pathname !== '/oauth/callback') {
-            res.writeHead(404).end();
-            return;
-          }
+        let waiters = loginWaiters.get(providerId);
+        if (!waiters) {
+          waiters = new Set();
+          loginWaiters.set(providerId, waiters);
+        }
+        waiters.add(ws);
 
-          const code = url.searchParams.get('code');
-          const rstate = url.searchParams.get('state');
-          if (!code || rstate !== state) {
-            res.writeHead(400).end('Invalid state or missing code');
-            return;
-          }
-
-          try {
-            const tokenUrl = cfg.oauth?.tokenUrl || 'https://auth.openai.com/token';
-            const body = new URLSearchParams({
-              grant_type: 'authorization_code',
-              code,
-              redirect_uri: callbackUrl,
-              client_id: clientId,
-              code_verifier: pkce.verifier,
-            });
-
-            const resp = await fetch(tokenUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body,
-            });
-
-            const json = await resp.json();
-            if (!resp.ok) {
-              res.writeHead(500).end('Token exchange failed');
-              return;
-            }
-
-            saveOAuthTokens({
-              access_token: json.access_token,
-              refresh_token: json.refresh_token,
-              expires_in: json.expires_in,
-              token_type: json.token_type,
-              scope: json.scope,
-            });
-
-            res.writeHead(200).end('Login complete. You can return to the CLI.');
-          } catch (e) {
-            res.writeHead(500).end('Token exchange error');
-          } finally {
-            server.close();
-          }
-        });
-
-        server.listen(redirectPort, '127.0.0.1');
-
-        const authUrl = new URL(authorizeUrl);
-        authUrl.searchParams.set('response_type', 'code');
-        authUrl.searchParams.set('client_id', clientId);
-        authUrl.searchParams.set('redirect_uri', callbackUrl);
-        authUrl.searchParams.set('scope', 'openid profile email offline_access');
-        authUrl.searchParams.set('state', state);
-        authUrl.searchParams.set('code_challenge', pkce.challenge);
-        authUrl.searchParams.set('code_challenge_method', pkce.method);
+        const result = await providers[providerId].startLogin();
 
         ws.send(
           JSON.stringify({
             id: authLoginStart.data.id,
             type: 'auth.login.started',
             ok: true,
-            payload: {
-              authUrl: authUrl.toString(),
-              callbackUrl,
-              state,
-              pkce: { method: pkce.method },
-            },
+            payload: { providerId, ...result },
           })
         );
+        return;
+      }
+
+      const authLoginComplete = AuthLoginCompleteSchema.safeParse(msg);
+      if (authLoginComplete.success) {
+        const providerId = authLoginComplete.data.payload.providerId ?? DEFAULT_PROVIDER_ID;
+        if (!isProviderId(providerId)) {
+          ws.send(JSON.stringify({
+            id: authLoginComplete.data.id,
+            type: 'error',
+            ok: false,
+            error: { code: 'PROVIDER_NOT_FOUND', message: `Unknown provider: ${providerId}` },
+          }));
+          return;
+        }
+
+        const { redirectUrl, code, state } = authLoginComplete.data.payload;
+        let input: any = null;
+        if (redirectUrl) {
+          input = { redirectUrl };
+        } else if (code && state) {
+          input = { code, state };
+        } else {
+          ws.send(JSON.stringify({
+            id: authLoginComplete.data.id,
+            type: 'error',
+            ok: false,
+            error: { code: 'OAUTH_MISSING_FIELDS', message: 'Missing redirectUrl or code/state' },
+          }));
+          return;
+        }
+
+        const result = await providers[providerId].completeLogin(input);
+
+        if (!result.ok) {
+          ws.send(JSON.stringify({
+            id: authLoginComplete.data.id,
+            type: 'error',
+            ok: false,
+            error: { code: 'OAUTH_EXCHANGE_FAILED', message: result.error },
+          }));
+          return;
+        }
+
+        ws.send(JSON.stringify({
+          id: authLoginComplete.data.id,
+          type: 'auth.login.completed',
+          ok: true,
+        }));
         return;
       }
 

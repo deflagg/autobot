@@ -7,7 +7,7 @@ export * from './auth.js';
 export * from './updates.js';
 export * from './safety.js';
 export * from './audit.js';
-export * from './openclaw.js';
+export * from './providers.js';
 
 export const ConfigSchema = z.object({
   repoPath: z.string(),
@@ -18,7 +18,10 @@ export const ConfigSchema = z.object({
       clientId: z.string().optional(),
       authorizeUrl: z.string().optional(),
       tokenUrl: z.string().optional(),
+      redirectHost: z.string().optional(),
       redirectPort: z.number().optional(),
+      redirectPath: z.string().optional(),
+      scopes: z.string().optional(),
     })
     .optional(),
 });
@@ -30,9 +33,9 @@ export const CONFIG_DEFAULTS: AutobotConfig = {
   ws: { port: 18790 },
   auth: { token: 'dev-token' },
   oauth: {
-    authorizeUrl: 'https://auth.openai.com/authorize',
-    tokenUrl: 'https://auth.openai.com/token',
-    redirectPort: 7777,
+    authorizeUrl: 'https://auth.openai.com/oauth/authorize',
+    tokenUrl: 'https://auth.openai.com/oauth/token',
+    redirectPort: 1455,
   },
 };
 

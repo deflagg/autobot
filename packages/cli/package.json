@@ -14,7 +14,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@autobot/core": "0.0.1",
     "@autobot/protocol": "0.0.1",
-    "@autobot/core": "0.0.1"
+    "ws": "^8.18.0"
   }
 }

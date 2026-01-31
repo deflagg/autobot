@@ -144,23 +144,23 @@ Client → server:
 ```
 Server → client:
 ```json
-{ "id": "<reqId>", "type": "auth.status.result", "ok": true, "payload": { "provider": "openai-codex", "configured": true, "refreshable": true } }
-```
-
-### `auth.import.openclaw`
-Client → server:
-```json
-{ "id": "<reqId>", "type": "auth.import.openclaw", "payload": { "path": "<optional>" } }
-```
-Server → client:
-```json
-{ "id": "<reqId>", "type": "auth.imported", "ok": true }
+{
+  "id": "<reqId>",
+  "type": "auth.status.result",
+  "ok": true,
+  "payload": {
+    "provider": "openai-codex",
+    "configured": true,
+    "refreshable": true,
+    "expired": false,
+    "refreshError": null
+  }
+}
 ```
 
 ### Auth-related errors
 - `AUTH_REQUIRED`
 - `AUTH_EXPIRED`
-- `AUTH_IMPORT_FAILED`
 
 ### `auth.login.start`
 Client → server:

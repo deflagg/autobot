@@ -22,3 +22,4 @@ TBD.
 - [Installer](docs/INSTALLER.md)
 - [Implementation stack](docs/IMPLEMENTATION_STACK.md)
 - [Milestones](docs/MILESTONES.md)
+- [Implementation plan](docs/IMPLEMENTATION_PLAN.md)

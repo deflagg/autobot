@@ -1,6 +1,7 @@
 # Next
 
 ## P0 (now)
+- [ ] Specify native OpenAI Codex OAuth login (daemon-initiated, CLI-driven).
 - [ ] Add OpenAI Codex OAuth requirements (reuse/import OpenClaw credentials).
 - [ ] Review and approve docs/MVP.md and docs/PROTOCOL.md (massage requirements).
 - [ ] ADR: Approach B self-modification pipeline + safety gates.

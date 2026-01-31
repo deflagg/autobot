@@ -126,3 +126,26 @@ The MVP must be able to authenticate to **OpenAI Codex** using **OAuth**, simila
 ### Verification
 - `autobot doctor` includes an OAuth check (token present, refreshable).
 - `autobot update --goal ...` can successfully call the Codex model using OAuth.
+
+### Native OAuth login (required)
+The MVP MUST provide a native login flow for OpenAI Codex OAuth.
+
+#### UX
+- `autobot auth login` triggers the daemon to begin OAuth.
+- The daemon returns an authorization URL.
+- The CLI opens the URL (best effort) or prints it for manual opening.
+- Login completion results in stored tokens and a refreshable session.
+
+#### Ownership
+- The **daemon** owns the OAuth client state and token store.
+- The **CLI** is the interactive frontend (start login, show URL, complete if needed, show status).
+
+#### Flow
+- Use Authorization Code + PKCE.
+- Prefer loopback callback to a local HTTP listener.
+- If loopback callback is not reachable in WSL2, support a fallback completion step (manual copy/paste) **if supported by provider**.
+
+#### Storage
+- Store credentials outside the repo:
+  - `~/.autobot/credentials/openai-codex.oauth.json` (chmod 600)
+- Redact tokens from logs and update artifacts.

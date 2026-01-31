@@ -158,3 +158,33 @@ Server → client:
 - `AUTH_REQUIRED`
 - `AUTH_EXPIRED`
 - `AUTH_IMPORT_FAILED`
+
+### `auth.login.start`
+Client → server:
+```json
+{ "id": "<reqId>", "type": "auth.login.start" }
+```
+Server → client:
+```json
+{
+  "id": "<reqId>",
+  "type": "auth.login.started",
+  "ok": true,
+  "payload": {
+    "authUrl": "https://...",
+    "callbackUrl": "http://127.0.0.1:<port>/oauth/callback",
+    "state": "...",
+    "pkce": { "method": "S256" }
+  }
+}
+```
+
+### `auth.login.complete` (fallback)
+Client → server:
+```json
+{ "id": "<reqId>", "type": "auth.login.complete", "payload": { "code": "...", "state": "..." } }
+```
+Server → client:
+```json
+{ "id": "<reqId>", "type": "auth.login.completed", "ok": true }
+```

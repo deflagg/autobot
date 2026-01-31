@@ -48,6 +48,21 @@ ws.on('message', (data: WebSocket.RawData) => {
       send(ws, { id, type: 'update.create', payload: { goal } });
       return;
     }
+    if (args[0] === 'apply') {
+      const updateId = args[1];
+      if (!updateId) {
+        console.error('Usage: autobot apply <updateId>');
+        ws.close();
+        return;
+      }
+      send(ws, { id, type: 'update.apply', payload: { updateId } });
+      return;
+    }
+    if (args[0] === 'rollback') {
+      const ref = args[1];
+      send(ws, { id, type: 'update.rollback', payload: { ref } });
+      return;
+    }
     // default: status
     send(ws, { id, type: 'status.get' });
     return;
@@ -76,6 +91,18 @@ ws.on('message', (data: WebSocket.RawData) => {
   }
 
   if (msg.type === 'update.created') {
+    console.log(JSON.stringify(msg.payload, null, 2));
+    ws.close();
+    return;
+  }
+
+  if (msg.type === 'update.applied') {
+    console.log(JSON.stringify(msg.payload, null, 2));
+    ws.close();
+    return;
+  }
+
+  if (msg.type === 'update.rolledBack') {
     console.log(JSON.stringify(msg.payload, null, 2));
     ws.close();
     return;

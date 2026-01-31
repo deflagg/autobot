@@ -5,6 +5,8 @@ import {
   AuthLoginStartSchema,
   AuthStatusGetSchema,
   UpdateCreateSchema,
+  UpdateApplySchema,
+  UpdateRollbackSchema,
 } from '@autobot/protocol';
 import {
   loadConfig,
@@ -13,12 +15,15 @@ import {
   isRefreshable,
   updateDir,
   updatesDir,
+  ensureCleanTree,
 } from '@autobot/core';
 import { createServer } from 'node:http';
 import { randomBytes, createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { ulid } from 'ulid';
 import { join } from 'node:path';
+import { simpleGit } from 'simple-git';
+import { execa } from 'execa';
 
 const start = Date.now();
 
@@ -39,11 +44,12 @@ function generatePKCE() {
 export function startDaemon() {
   const cfg = loadConfig();
   const wss = new WebSocketServer({ host: '127.0.0.1', port: cfg.ws.port });
+  const git = simpleGit(cfg.repoPath);
 
   wss.on('connection', (ws: import('ws').WebSocket) => {
     let authed = false;
 
-    ws.on('message', (data: import('ws').RawData) => {
+    ws.on('message', async (data: import('ws').RawData) => {
       let msg: unknown;
       try {
         msg = JSON.parse(String(data));
@@ -224,6 +230,74 @@ export function startDaemon() {
             payload: { updateId, path: dir },
           })
         );
+        return;
+      }
+
+      const updateApply = UpdateApplySchema.safeParse(msg);
+      if (updateApply.success) {
+        try {
+          await ensureCleanTree(cfg.repoPath, git);
+          const dir = updateDir(cfg.repoPath, updateApply.data.payload.updateId);
+          const patchPath = join(dir, 'patch.diff');
+          const patch = readFileSync(patchPath, 'utf8');
+
+          // apply patch
+          await git.applyPatch(patch);
+
+          // verify (minimal): build + test
+          await execa('npm', ['run', 'build'], { cwd: cfg.repoPath, stdio: 'inherit' });
+          await execa('npm', ['test'], { cwd: cfg.repoPath, stdio: 'inherit' });
+
+          // commit
+          await git.add('.');
+          await git.commit(`autobot(update): ${updateApply.data.payload.updateId}`);
+          const head = await git.revparse(['HEAD']);
+
+          ws.send(
+            JSON.stringify({
+              id: updateApply.data.id,
+              type: 'update.applied',
+              ok: true,
+              payload: { updateId: updateApply.data.payload.updateId, commit: head },
+            })
+          );
+        } catch (e: any) {
+          ws.send(
+            JSON.stringify({
+              id: updateApply.data.id,
+              type: 'error',
+              ok: false,
+              error: { code: 'APPLY_FAILED', message: String(e?.message || e) },
+            })
+          );
+        }
+        return;
+      }
+
+      const updateRollback = UpdateRollbackSchema.safeParse(msg);
+      if (updateRollback.success) {
+        try {
+          const ref = updateRollback.data.payload.ref || 'HEAD~1';
+          await git.reset(['--hard', ref]);
+          const head = await git.revparse(['HEAD']);
+          ws.send(
+            JSON.stringify({
+              id: updateRollback.data.id,
+              type: 'update.rolledBack',
+              ok: true,
+              payload: { head },
+            })
+          );
+        } catch (e: any) {
+          ws.send(
+            JSON.stringify({
+              id: updateRollback.data.id,
+              type: 'error',
+              ok: false,
+              error: { code: 'ROLLBACK_FAILED', message: String(e?.message || e) },
+            })
+          );
+        }
         return;
       }
 

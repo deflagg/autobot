@@ -57,3 +57,34 @@ export const UpdateCreatedSchema = EnvelopeSchema.extend({
     path: z.string(),
   }),
 });
+
+export const UpdateApplySchema = EnvelopeSchema.extend({
+  type: z.literal('update.apply'),
+  payload: z.object({
+    updateId: z.string(),
+  }),
+});
+
+export const UpdateAppliedSchema = EnvelopeSchema.extend({
+  type: z.literal('update.applied'),
+  ok: z.literal(true),
+  payload: z.object({
+    updateId: z.string(),
+    commit: z.string(),
+  }),
+});
+
+export const UpdateRollbackSchema = EnvelopeSchema.extend({
+  type: z.literal('update.rollback'),
+  payload: z.object({
+    ref: z.string().optional(),
+  }),
+});
+
+export const UpdateRolledBackSchema = EnvelopeSchema.extend({
+  type: z.literal('update.rolledBack'),
+  ok: z.literal(true),
+  payload: z.object({
+    head: z.string(),
+  }),
+});

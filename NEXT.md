@@ -1,6 +1,7 @@
 # Next
 
 ## P0 (now)
+- [ ] Review and approve docs/MVP.md and docs/PROTOCOL.md (massage requirements).
 - [ ] ADR: Approach B self-modification pipeline + safety gates.
 - [ ] Define minimal guardrails contract: plan → diff → apply → test → commit → restart.
 - [ ] Implement `autobot self-update --goal ...` v1:

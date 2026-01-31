@@ -8,8 +8,7 @@ Bootstrap v0: CLI + self-update (approach B: self-edit + rebuild).
 - Tracking files in place (README/STATUS/NEXT/HANDOFF/DECISIONS/LOG)
 
 ## In progress
-- Implement v0 CLI skeleton
-- Implement v0 self-update pipeline (plan+diff+apply) with guardrails
+- MVP requirements and WS protocol drafted in docs.
 
 ## Next (top 5)
 See `NEXT.md`.

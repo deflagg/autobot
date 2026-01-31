@@ -7,6 +7,7 @@ export * from './auth.js';
 export * from './updates.js';
 export * from './safety.js';
 export * from './audit.js';
+export * from './openclaw.js';
 
 export const ConfigSchema = z.object({
   repoPath: z.string(),

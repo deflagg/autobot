@@ -20,6 +20,7 @@ import {
   updatesDir,
   ensureCleanTree,
   appendAudit,
+  getOpenClawClientId,
 } from '@autobot/core';
 import { createServer } from 'node:http';
 import { randomBytes, createHash } from 'node:crypto';
@@ -90,7 +91,6 @@ export function startDaemon() {
     if (!loopState) return;
 
     while (loopState.running) {
-      // stop conditions
       if (loopState.maxIterations && loopState.iteration >= loopState.maxIterations) {
         loopState.running = false;
         break;
@@ -102,11 +102,9 @@ export function startDaemon() {
 
       loopState.iteration += 1;
 
-      // create update proposal (stub)
       const { updateId, patch } = await createUpdateArtifacts(cfg.repoPath, loopState.goal);
       loopState.lastUpdateId = updateId;
 
-      // stagnation detection
       const patchHash = hash(patch);
       if (loopState.lastPatchHash && loopState.lastPatchHash === patchHash) {
         loopState.running = false;
@@ -120,7 +118,6 @@ export function startDaemon() {
       }
       loopState.lastPatchHash = patchHash;
 
-      // apply
       let attempt = 0;
       let applied = false;
       while (attempt <= loopState.retry) {
@@ -248,7 +245,17 @@ export function startDaemon() {
         const redirectPort = cfg.oauth?.redirectPort ?? 7777;
         const callbackUrl = `http://127.0.0.1:${redirectPort}/oauth/callback`;
         const authorizeUrl = cfg.oauth?.authorizeUrl || 'https://auth.openai.com/authorize';
-        const clientId = cfg.oauth?.clientId || '';
+        const clientId = cfg.oauth?.clientId || getOpenClawClientId() || '';
+
+        if (!clientId) {
+          ws.send(JSON.stringify({
+            id: authLoginStart.data.id,
+            type: 'error',
+            ok: false,
+            error: { code: 'OAUTH_CLIENT_ID_MISSING', message: 'OAuth client id not found; set oauth.clientId or install OpenClaw OAuth' },
+          }));
+          return;
+        }
 
         const server = createServer(async (req, res) => {
           if (!req.url) return;

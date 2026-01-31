@@ -194,3 +194,8 @@ Autobot must support a daemon-run **continuous update loop** that keeps generati
 
 ## Implementation stack (reference)
 See [IMPLEMENTATION_STACK.md](./IMPLEMENTATION_STACK.md).
+
+---
+
+## Zero-touch installer (required)
+See [INSTALLER.md](./INSTALLER.md).

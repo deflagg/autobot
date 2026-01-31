@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 
 export * from './auth.js';
+export * from './updates.js';
 
 export const ConfigSchema = z.object({
   repoPath: z.string(),

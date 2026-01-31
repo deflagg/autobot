@@ -1,8 +1,24 @@
 import { WebSocketServer } from 'ws';
-import { EnvelopeSchema, StatusGetSchema, AuthLoginStartSchema, AuthStatusGetSchema } from '@autobot/protocol';
-import { loadConfig, loadOAuthTokens, saveOAuthTokens, isRefreshable } from '@autobot/core';
+import {
+  EnvelopeSchema,
+  StatusGetSchema,
+  AuthLoginStartSchema,
+  AuthStatusGetSchema,
+  UpdateCreateSchema,
+} from '@autobot/protocol';
+import {
+  loadConfig,
+  loadOAuthTokens,
+  saveOAuthTokens,
+  isRefreshable,
+  updateDir,
+  updatesDir,
+} from '@autobot/core';
 import { createServer } from 'node:http';
 import { randomBytes, createHash } from 'node:crypto';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { ulid } from 'ulid';
+import { join } from 'node:path';
 
 const start = Date.now();
 
@@ -98,7 +114,6 @@ export function startDaemon() {
         const authorizeUrl = cfg.oauth?.authorizeUrl || 'https://auth.openai.com/authorize';
         const clientId = cfg.oauth?.clientId || '';
 
-        // Start daemon-owned callback listener
         const server = createServer(async (req, res) => {
           if (!req.url) return;
           const url = new URL(req.url, callbackUrl);
@@ -114,7 +129,6 @@ export function startDaemon() {
             return;
           }
 
-          // Exchange code for tokens (real implementation depends on provider).
           try {
             const tokenUrl = cfg.oauth?.tokenUrl || 'https://auth.openai.com/token';
             const body = new URLSearchParams({
@@ -175,6 +189,39 @@ export function startDaemon() {
               state,
               pkce: { method: pkce.method },
             },
+          })
+        );
+        return;
+      }
+
+      const updateCreate = UpdateCreateSchema.safeParse(msg);
+      if (updateCreate.success) {
+        const updateId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${ulid()}`;
+        const dir = updateDir(cfg.repoPath, updateId);
+        mkdirSync(updatesDir(cfg.repoPath), { recursive: true });
+        mkdirSync(dir, { recursive: true });
+
+        const request = {
+          id: updateId,
+          goal: updateCreate.data.payload.goal,
+          createdAt: new Date().toISOString(),
+        };
+        const plan = {
+          goal: updateCreate.data.payload.goal,
+          steps: ['(stub) derive plan from goal'],
+        };
+        const patch = `# patch for ${updateId}\n# (stub)\n`;
+
+        writeFileSync(join(dir, 'request.json'), JSON.stringify(request, null, 2));
+        writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
+        writeFileSync(join(dir, 'patch.diff'), patch);
+
+        ws.send(
+          JSON.stringify({
+            id: updateCreate.data.id,
+            type: 'update.created',
+            ok: true,
+            payload: { updateId, path: dir },
           })
         );
         return;

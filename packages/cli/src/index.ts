@@ -38,6 +38,16 @@ ws.on('message', (data: WebSocket.RawData) => {
       send(ws, { id, type: 'auth.status.get' });
       return;
     }
+    if (args[0] === 'update') {
+      const goal = args.slice(1).join(' ').trim();
+      if (!goal) {
+        console.error('Usage: autobot update <goal>');
+        ws.close();
+        return;
+      }
+      send(ws, { id, type: 'update.create', payload: { goal } });
+      return;
+    }
     // default: status
     send(ws, { id, type: 'status.get' });
     return;
@@ -60,6 +70,12 @@ ws.on('message', (data: WebSocket.RawData) => {
   }
 
   if (msg.type === 'auth.status.result') {
+    console.log(JSON.stringify(msg.payload, null, 2));
+    ws.close();
+    return;
+  }
+
+  if (msg.type === 'update.created') {
     console.log(JSON.stringify(msg.payload, null, 2));
     ws.close();
     return;

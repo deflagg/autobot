@@ -41,3 +41,19 @@ export const AuthLoginStartSchema = EnvelopeSchema.extend({
 export const AuthStatusGetSchema = EnvelopeSchema.extend({
   type: z.literal('auth.status.get'),
 });
+
+export const UpdateCreateSchema = EnvelopeSchema.extend({
+  type: z.literal('update.create'),
+  payload: z.object({
+    goal: z.string(),
+  }),
+});
+
+export const UpdateCreatedSchema = EnvelopeSchema.extend({
+  type: z.literal('update.created'),
+  ok: z.literal(true),
+  payload: z.object({
+    updateId: z.string(),
+    path: z.string(),
+  }),
+});

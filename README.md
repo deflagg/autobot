@@ -15,3 +15,10 @@ A from-scratch, rethink-first personal automation agent.
 
 ## Getting started
 TBD.
+
+## Design docs
+- [v0.1 Spec](docs/V0_1_SPEC.md)
+- [Protocol](docs/PROTOCOL.md)
+- [Installer](docs/INSTALLER.md)
+- [Implementation stack](docs/IMPLEMENTATION_STACK.md)
+- [Milestones](docs/MILESTONES.md)

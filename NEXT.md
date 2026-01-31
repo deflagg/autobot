@@ -1,6 +1,7 @@
 # Next
 
 ## P0 (now)
+- [ ] Review docs/V0_1_SPEC.md and docs/MILESTONES.md.
 - [ ] Define zero-touch Ubuntu installer (curl|bash) that installs Node + service.
 - [ ] Specify continuous update loop (start/status/stop) with automatic rollback+retry.
 - [ ] Specify native OpenAI Codex OAuth login (daemon-initiated, CLI-driven).

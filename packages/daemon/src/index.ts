@@ -316,7 +316,7 @@ export function startDaemon() {
         authUrl.searchParams.set('response_type', 'code');
         authUrl.searchParams.set('client_id', clientId);
         authUrl.searchParams.set('redirect_uri', callbackUrl);
-        authUrl.searchParams.set('scope', 'openid');
+        authUrl.searchParams.set('scope', 'openid profile email offline_access');
         authUrl.searchParams.set('state', state);
         authUrl.searchParams.set('code_challenge', pkce.challenge);
         authUrl.searchParams.set('code_challenge_method', pkce.method);

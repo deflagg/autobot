@@ -179,6 +179,7 @@ Autobot must support a daemon-run **continuous update loop** that keeps generati
 ### Failure handling (retry + rollback)
 - On verify failure, the daemon MUST:
   - automatically rollback the working tree to the last known good commit (the pre-iteration HEAD)
+  - for each retry attempt: regenerate a NEW plan+patch using the failure context (do not blindly reapply the same diff)
   - retry up to `retry` attempts per iteration (default TBD)
 - The loop MUST stop if:
   - retries are exhausted

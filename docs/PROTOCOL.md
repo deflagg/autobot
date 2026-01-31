@@ -199,7 +199,7 @@ Server → client:
 ### `loop.start`
 Client → server:
 ```json
-{ "id": "<reqId>", "type": "loop.start", "payload": { "goal": "...", "maxIterations": 20, "maxMinutes": 60, "retry": 2 } }
+{ "id": "<reqId>", "type": "loop.start", "payload": { "goal": "...", "maxIterations": 20, "maxMinutes": 60, "retry": 2, "retryMode": "regenerate" } }
 ```
 Server → client:
 ```json
@@ -230,3 +230,4 @@ Server → client:
 - `loop.progress` — stage/iteration progress
 - `loop.iteration.completed` — per iteration summary
 - `loop.iteration.failed` — includes retry count and rollback action
+- `loop.retrying` — indicates rollback completed and a new plan/patch generation has started

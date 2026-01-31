@@ -23,6 +23,9 @@ Example:
 ## Authentication
 Client must authenticate before any other request.
 
+**Note:** The OAuth callback listener (loopback HTTP server) is **daemon-owned**. The CLI never binds callback ports; it only initiates login and (optionally) submits fallback codes.
+
+
 ### Client → Server: `auth`
 ```json
 { "id": "<reqId>", "type": "auth", "payload": { "token": "..." } }

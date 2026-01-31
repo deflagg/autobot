@@ -138,11 +138,12 @@ The MVP MUST provide a native login flow for OpenAI Codex OAuth.
 
 #### Ownership
 - The **daemon** owns the OAuth client state and token store.
+- The **daemon** also owns the OAuth loopback callback listener (HTTP server).
 - The **CLI** is the interactive frontend (start login, show URL, complete if needed, show status).
 
 #### Flow
 - Use Authorization Code + PKCE.
-- Prefer loopback callback to a local HTTP listener.
+- Prefer loopback callback to a local HTTP listener **owned by the daemon** (daemon starts/stops the callback server and validates state/PKCE).
 - If loopback callback is not reachable in WSL2, support a fallback completion step (manual copy/paste) **if supported by provider**.
 
 #### Storage

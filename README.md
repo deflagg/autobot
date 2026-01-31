@@ -65,6 +65,16 @@ Safety config (optional):
 }
 ```
 
+LLM config (optional):
+```json
+{
+  "llm": {
+    "model": "gpt-4.1",
+    "endpoint": "https://api.openai.com/v1/responses"
+  }
+}
+```
+
 Daemon PID lock: the daemon writes `~/.autobot/daemon.pid` and refuses to start if a daemon is already running.
 
 ## Design docs

@@ -20,6 +20,8 @@
 - Verified end-to-end auth login (loopback + event completion).
 - Cleaned test artifacts (dist outputs, temp files) and reset config to defaults.
 - Added chat loop + safety allowlist/denylist; smoke test passed.
+- Renamed patch artifacts to change (no fallback).
+- LLM generation wired into update.create (direct HTTP, no SDK).
 - Build ran clean.
 
 ## 2026-01-30

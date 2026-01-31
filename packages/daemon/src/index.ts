@@ -57,18 +57,58 @@ async function createUpdateArtifacts(repoPath: string, goal: string) {
   mkdirSync(dir, { recursive: true });
 
   const request = { id: updateId, goal, createdAt: new Date().toISOString() };
-  const plan = { goal, steps: ['(stub) derive plan from goal'] };
-  const change = `# change for ${updateId}\n# (stub)\n`;
-
   writeFileSync(join(dir, 'request.json'), JSON.stringify(request, null, 2));
-  writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
-  writeFileSync(join(dir, 'change.diff'), change);
 
-  return { updateId, dir, change };
+  return { updateId, dir };
 }
 
 function hash(str: string) {
   return createHash('sha256').update(str).digest('hex');
+}
+
+function extractBetween(text: string, start: string, end: string): string | null {
+  const s = text.indexOf(start);
+  const e = text.indexOf(end);
+  if (s === -1 || e === -1 || e <= s) return null;
+  return text.slice(s + start.length, e).trim();
+}
+
+async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadConfig>, provider: AuthProvider) {
+  if (!provider.ensureValidToken) throw new Error('LLM provider missing ensureValidToken');
+  const { accessToken } = await provider.ensureValidToken();
+
+  const model = cfg.llm?.model || 'gpt-4.1';
+  const endpoint = cfg.llm?.endpoint || 'https://api.openai.com/v1/responses';
+
+  const system = `You are a coding agent. Produce two artifacts: a JSON plan and a unified diff. Use the strict tags <PLAN_JSON>...</PLAN_JSON> and <CHANGE_DIFF>...</CHANGE_DIFF>. The diff must be relative to repo root.`;
+  const user = `Goal: ${goal}`;
+
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      model,
+      input: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature: 0.2,
+    }),
+  });
+
+  const json = await resp.json();
+  if (!resp.ok) throw new Error(`LLM request failed: ${json?.error?.message || resp.statusText}`);
+
+  const text = json?.output_text || json?.output?.[0]?.content?.[0]?.text || '';
+  const planRaw = extractBetween(text, '<PLAN_JSON>', '</PLAN_JSON>');
+  const changeRaw = extractBetween(text, '<CHANGE_DIFF>', '</CHANGE_DIFF>');
+  if (!planRaw || !changeRaw) throw new Error('LLM output missing plan or change');
+
+  const plan = JSON.parse(planRaw);
+  return { plan, change: changeRaw, model };
 }
 
 export function startDaemon() {
@@ -135,8 +175,13 @@ export function startDaemon() {
 
       loopState.iteration += 1;
 
-      const { updateId, change } = await createUpdateArtifacts(cfg.repoPath, loopState.goal);
+      const { updateId, dir } = await createUpdateArtifacts(cfg.repoPath, loopState.goal);
       loopState.lastUpdateId = updateId;
+
+      const provider = providers[DEFAULT_PROVIDER_ID];
+      const { plan, change } = await generateChangeWithLlm(loopState.goal, cfg, provider);
+      writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
+      writeFileSync(join(dir, 'change.diff'), change);
 
       const changeHash = hash(change);
       if (loopState.lastPatchHash && loopState.lastPatchHash === changeHash) {
@@ -407,15 +452,33 @@ export function startDaemon() {
 
       const updateCreate = UpdateCreateSchema.safeParse(msg);
       if (updateCreate.success) {
-        const { updateId, dir } = await createUpdateArtifacts(cfg.repoPath, updateCreate.data.payload.goal);
-        ws.send(
-          JSON.stringify({
-            id: updateCreate.data.id,
-            type: 'update.created',
-            ok: true,
-            payload: { updateId, path: dir },
-          })
-        );
+        try {
+          const { updateId, dir } = await createUpdateArtifacts(cfg.repoPath, updateCreate.data.payload.goal);
+          const provider = providers[DEFAULT_PROVIDER_ID];
+          const { plan, change, model } = await generateChangeWithLlm(updateCreate.data.payload.goal, cfg, provider);
+
+          writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
+          writeFileSync(join(dir, 'change.diff'), change);
+          appendAudit({ type: 'update.created', updateId, model });
+
+          ws.send(
+            JSON.stringify({
+              id: updateCreate.data.id,
+              type: 'update.created',
+              ok: true,
+              payload: { updateId, path: dir },
+            })
+          );
+        } catch (e: any) {
+          ws.send(
+            JSON.stringify({
+              id: updateCreate.data.id,
+              type: 'error',
+              ok: false,
+              error: { code: 'LLM_FAILED', message: String(e?.message || e) },
+            })
+          );
+        }
         return;
       }
 

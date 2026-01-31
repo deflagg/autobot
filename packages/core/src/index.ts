@@ -13,6 +13,12 @@ export const ConfigSchema = z.object({
   repoPath: z.string(),
   ws: z.object({ port: z.number() }),
   auth: z.object({ token: z.string() }),
+  llm: z
+    .object({
+      model: z.string().optional(),
+      endpoint: z.string().optional(),
+    })
+    .optional(),
   safety: z
     .object({
       allowlist: z.array(z.string()).optional(),
@@ -38,6 +44,10 @@ export const CONFIG_DEFAULTS: AutobotConfig = {
   repoPath: process.cwd(),
   ws: { port: 18790 },
   auth: { token: 'dev-token' },
+  llm: {
+    model: 'gpt-4.1',
+    endpoint: 'https://api.openai.com/v1/responses',
+  },
   safety: {
     denylist: ['.git/**', '.env', '*.pem', '*.key', '**/*token*', '**/*credentials*'],
   },
@@ -70,6 +80,7 @@ export function loadConfig(): AutobotConfig {
     ...parsed,
     ws: { ...CONFIG_DEFAULTS.ws, ...(parsed.ws || {}) },
     auth: { ...CONFIG_DEFAULTS.auth, ...(parsed.auth || {}) },
+    llm: { ...CONFIG_DEFAULTS.llm, ...(parsed.llm || {}) },
     safety: { ...CONFIG_DEFAULTS.safety, ...(parsed.safety || {}) },
     oauth: { ...CONFIG_DEFAULTS.oauth, ...(parsed.oauth || {}) },
   };

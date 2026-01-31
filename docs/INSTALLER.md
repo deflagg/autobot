@@ -11,7 +11,7 @@ Provide a **single command**, **non-interactive** installer that provisions:
 Target command:
 
 ```bash
-curl -fsSL https://autobot.deflagg.com/install.sh | bash
+curl -fsSL https://github.com/deflagg/autobot/install.sh | bash
 ```
 
 ## Constraints
@@ -65,3 +65,12 @@ All optional; defaults used if unset.
 ## Notes (WSL2)
 - systemd user services require systemd enabled in WSL2.
 - If systemd is unavailable, installer should fail with a clear message.
+
+## Practical note
+GitHub's HTML URL is not a raw script. In implementation we should point to the raw content URL, e.g.:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/deflagg/autobot/master/install.sh | bash
+```
+
+We keep the top-level command string aligned with product requirements, but the actual install entrypoint should be a raw, cacheable script.

@@ -63,6 +63,30 @@ ws.on('message', (data: WebSocket.RawData) => {
       send(ws, { id, type: 'update.rollback', payload: { ref } });
       return;
     }
+    if (args[0] === 'loop' && args[1] === 'start') {
+      const goal = args.slice(2).join(' ').trim();
+      if (!goal) {
+        console.error('Usage: autobot loop start <goal>');
+        ws.close();
+        return;
+      }
+      send(ws, { id, type: 'loop.start', payload: { goal } });
+      return;
+    }
+    if (args[0] === 'loop' && args[1] === 'status') {
+      send(ws, { id, type: 'loop.status.get' });
+      return;
+    }
+    if (args[0] === 'loop' && args[1] === 'stop') {
+      const loopId = args[2];
+      if (!loopId) {
+        console.error('Usage: autobot loop stop <loopId>');
+        ws.close();
+        return;
+      }
+      send(ws, { id, type: 'loop.stop', payload: { loopId } });
+      return;
+    }
     // default: status
     send(ws, { id, type: 'status.get' });
     return;
@@ -105,6 +129,14 @@ ws.on('message', (data: WebSocket.RawData) => {
   if (msg.type === 'update.rolledBack') {
     console.log(JSON.stringify(msg.payload, null, 2));
     ws.close();
+    return;
+  }
+
+  if (msg.type === 'loop.started' || msg.type === 'loop.status.result' || msg.type === 'loop.iteration.completed' || msg.type === 'loop.iteration.failed' || msg.type === 'loop.stopped') {
+    console.log(JSON.stringify(msg, null, 2));
+    if (msg.type === 'loop.started' || msg.type === 'loop.status.result') {
+      ws.close();
+    }
     return;
   }
 

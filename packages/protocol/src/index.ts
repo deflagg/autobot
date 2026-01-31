@@ -88,3 +88,27 @@ export const UpdateRolledBackSchema = EnvelopeSchema.extend({
     head: z.string(),
   }),
 });
+
+export const LoopStartSchema = EnvelopeSchema.extend({
+  type: z.literal('loop.start'),
+  payload: z.object({
+    goal: z.string(),
+    maxIterations: z.number().optional(),
+    maxMinutes: z.number().optional(),
+    retry: z.number().optional(),
+  }),
+});
+
+export const LoopStatusSchema = EnvelopeSchema.extend({
+  type: z.literal('loop.status.get'),
+  payload: z.object({
+    loopId: z.string().optional(),
+  }).optional(),
+});
+
+export const LoopStopSchema = EnvelopeSchema.extend({
+  type: z.literal('loop.stop'),
+  payload: z.object({
+    loopId: z.string(),
+  }),
+});

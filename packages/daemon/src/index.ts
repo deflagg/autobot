@@ -7,6 +7,9 @@ import {
   UpdateCreateSchema,
   UpdateApplySchema,
   UpdateRollbackSchema,
+  LoopStartSchema,
+  LoopStatusSchema,
+  LoopStopSchema,
 } from '@autobot/protocol';
 import {
   loadConfig,
@@ -27,6 +30,20 @@ import { execa } from 'execa';
 
 const start = Date.now();
 
+type LoopState = {
+  loopId: string;
+  goal: string;
+  running: boolean;
+  iteration: number;
+  retry: number;
+  maxIterations?: number;
+  maxMinutes?: number;
+  startedAt: number;
+  lastUpdateId?: string;
+};
+
+let loopState: LoopState | null = null;
+
 function base64url(input: Buffer) {
   return input
     .toString('base64')
@@ -41,10 +58,102 @@ function generatePKCE() {
   return { verifier, challenge, method: 'S256' as const };
 }
 
+async function createUpdateArtifacts(repoPath: string, goal: string) {
+  const updateId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${ulid()}`;
+  const dir = updateDir(repoPath, updateId);
+  mkdirSync(updatesDir(repoPath), { recursive: true });
+  mkdirSync(dir, { recursive: true });
+
+  const request = { id: updateId, goal, createdAt: new Date().toISOString() };
+  const plan = { goal, steps: ['(stub) derive plan from goal'] };
+  const patch = `# patch for ${updateId}\n# (stub)\n`;
+
+  writeFileSync(join(dir, 'request.json'), JSON.stringify(request, null, 2));
+  writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
+  writeFileSync(join(dir, 'patch.diff'), patch);
+
+  return { updateId, dir };
+}
+
 export function startDaemon() {
   const cfg = loadConfig();
   const wss = new WebSocketServer({ host: '127.0.0.1', port: cfg.ws.port });
   const git = simpleGit(cfg.repoPath);
+
+  async function runLoop(ws: import('ws').WebSocket) {
+    if (!loopState) return;
+
+    while (loopState.running) {
+      // stop conditions
+      if (loopState.maxIterations && loopState.iteration >= loopState.maxIterations) {
+        loopState.running = false;
+        break;
+      }
+      if (loopState.maxMinutes && (Date.now() - loopState.startedAt) / 60000 >= loopState.maxMinutes) {
+        loopState.running = false;
+        break;
+      }
+
+      loopState.iteration += 1;
+
+      // create update proposal (stub)
+      const { updateId } = await createUpdateArtifacts(cfg.repoPath, loopState.goal);
+      loopState.lastUpdateId = updateId;
+
+      // apply
+      let attempt = 0;
+      let applied = false;
+      while (attempt <= loopState.retry) {
+        try {
+          await ensureCleanTree(cfg.repoPath, git);
+          const dir = updateDir(cfg.repoPath, updateId);
+          const patchPath = join(dir, 'patch.diff');
+          const patch = readFileSync(patchPath, 'utf8');
+
+          await git.applyPatch(patch);
+          await execa('npm', ['run', 'build'], { cwd: cfg.repoPath, stdio: 'inherit' });
+          await execa('npm', ['test'], { cwd: cfg.repoPath, stdio: 'inherit' });
+
+          await git.add('.');
+          await git.commit(`autobot(loop:${loopState.loopId}): ${updateId}`);
+          const head = await git.revparse(['HEAD']);
+
+          ws.send(JSON.stringify({
+            id: loopState.loopId,
+            type: 'loop.iteration.completed',
+            ok: true,
+            payload: { updateId, commit: head, iteration: loopState.iteration },
+          }));
+
+          applied = true;
+          break;
+        } catch (e: any) {
+          // rollback
+          await git.reset(['--hard', 'HEAD']);
+          ws.send(JSON.stringify({
+            id: loopState.loopId,
+            type: 'loop.iteration.failed',
+            ok: false,
+            error: { code: 'VERIFY_FAILED', message: String(e?.message || e) },
+            payload: { attempt },
+          }));
+          attempt += 1;
+        }
+      }
+
+      if (!applied) {
+        loopState.running = false;
+        break;
+      }
+    }
+
+    ws.send(JSON.stringify({
+      id: loopState.loopId,
+      type: 'loop.stopped',
+      ok: true,
+      payload: { loopId: loopState.loopId },
+    }));
+  }
 
   wss.on('connection', (ws: import('ws').WebSocket) => {
     let authed = false;
@@ -202,26 +311,7 @@ export function startDaemon() {
 
       const updateCreate = UpdateCreateSchema.safeParse(msg);
       if (updateCreate.success) {
-        const updateId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${ulid()}`;
-        const dir = updateDir(cfg.repoPath, updateId);
-        mkdirSync(updatesDir(cfg.repoPath), { recursive: true });
-        mkdirSync(dir, { recursive: true });
-
-        const request = {
-          id: updateId,
-          goal: updateCreate.data.payload.goal,
-          createdAt: new Date().toISOString(),
-        };
-        const plan = {
-          goal: updateCreate.data.payload.goal,
-          steps: ['(stub) derive plan from goal'],
-        };
-        const patch = `# patch for ${updateId}\n# (stub)\n`;
-
-        writeFileSync(join(dir, 'request.json'), JSON.stringify(request, null, 2));
-        writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
-        writeFileSync(join(dir, 'patch.diff'), patch);
-
+        const { updateId, dir } = await createUpdateArtifacts(cfg.repoPath, updateCreate.data.payload.goal);
         ws.send(
           JSON.stringify({
             id: updateCreate.data.id,
@@ -241,14 +331,10 @@ export function startDaemon() {
           const patchPath = join(dir, 'patch.diff');
           const patch = readFileSync(patchPath, 'utf8');
 
-          // apply patch
           await git.applyPatch(patch);
-
-          // verify (minimal): build + test
           await execa('npm', ['run', 'build'], { cwd: cfg.repoPath, stdio: 'inherit' });
           await execa('npm', ['test'], { cwd: cfg.repoPath, stdio: 'inherit' });
 
-          // commit
           await git.add('.');
           await git.commit(`autobot(update): ${updateApply.data.payload.updateId}`);
           const head = await git.revparse(['HEAD']);
@@ -298,6 +384,50 @@ export function startDaemon() {
             })
           );
         }
+        return;
+      }
+
+      const loopStart = LoopStartSchema.safeParse(msg);
+      if (loopStart.success) {
+        const loopId = ulid();
+        loopState = {
+          loopId,
+          goal: loopStart.data.payload.goal,
+          running: true,
+          iteration: 0,
+          retry: loopStart.data.payload.retry ?? 1,
+          maxIterations: loopStart.data.payload.maxIterations,
+          maxMinutes: loopStart.data.payload.maxMinutes,
+          startedAt: Date.now(),
+        };
+
+        ws.send(JSON.stringify({ id: loopStart.data.id, type: 'loop.started', ok: true, payload: { loopId } }));
+        runLoop(ws);
+        return;
+      }
+
+      const loopStatus = LoopStatusSchema.safeParse(msg);
+      if (loopStatus.success) {
+        ws.send(JSON.stringify({
+          id: loopStatus.data.id,
+          type: 'loop.status.result',
+          ok: true,
+          payload: loopState
+            ? {
+                loopId: loopState.loopId,
+                state: loopState.running ? 'running' : 'stopped',
+                iteration: loopState.iteration,
+                lastUpdateId: loopState.lastUpdateId,
+              }
+            : { loopId: null, state: 'stopped' },
+        }));
+        return;
+      }
+
+      const loopStop = LoopStopSchema.safeParse(msg);
+      if (loopStop.success && loopState && loopState.loopId === loopStop.data.payload.loopId) {
+        loopState.running = false;
+        ws.send(JSON.stringify({ id: loopStop.data.id, type: 'loop.stopped', ok: true, payload: { loopId: loopState.loopId } }));
         return;
       }
 

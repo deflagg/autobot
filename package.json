@@ -1,0 +1,16 @@
+{
+  "name": "autobot",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "npm -ws run build",
+    "test": "npm -ws run test",
+    "lint": "npm -ws run lint",
+    "clean": "rimraf packages/*/dist",
+    "typecheck": "npm -ws run typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "rimraf": "^5.0.7"
+  }
+}

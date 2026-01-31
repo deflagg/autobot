@@ -1,0 +1,13 @@
+{
+  "name": "@autobot/core",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "echo 'no tests'",
+    "lint": "echo 'no lint'",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@autobot/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "autobot": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "echo 'no tests'",
+    "lint": "echo 'no lint'",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@autobot/protocol": "0.0.1",
+    "@autobot/core": "0.0.1"
+  }
+}

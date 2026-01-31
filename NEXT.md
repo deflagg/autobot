@@ -1,6 +1,7 @@
 # Next
 
 ## P0 (now)
+- [ ] Complete Iteration 0: monorepo skeleton, build scripts, stubs.
 - [ ] Review docs/IMPLEMENTATION_PLAN.md iterations.
 - [ ] Review docs/V0_1_SPEC.md and docs/MILESTONES.md.
 - [ ] Define zero-touch Ubuntu installer (curl|bash) that installs Node + service.

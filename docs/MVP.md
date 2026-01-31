@@ -191,3 +191,6 @@ Autobot must support a daemon-run **continuous update loop** that keeps generati
 ### Auditability
 - Loop state is persisted, e.g. under `loops/<loopId>/state.json`, and references per-iteration `updates/<updateId>/...` artifacts.
 - Commit messages include `loopId` and iteration number.
+
+## Implementation stack (reference)
+See [IMPLEMENTATION_STACK.md](./IMPLEMENTATION_STACK.md).

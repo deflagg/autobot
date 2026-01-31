@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import WebSocket from 'ws';
 import { loadConfig } from '@autobot/core';
+import { execSync } from 'node:child_process';
 
 const cfg = loadConfig();
 const url = `ws://127.0.0.1:${cfg.ws.port}`;
@@ -8,6 +9,15 @@ const args = process.argv.slice(2);
 
 function send(ws: WebSocket, msg: any) {
   ws.send(JSON.stringify(msg));
+}
+
+function openUrl(url: string) {
+  try {
+    execSync(`xdg-open "${url}"`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const ws = new WebSocket(url);
@@ -34,8 +44,17 @@ ws.on('message', (data: WebSocket.RawData) => {
   }
 
   if (msg.type === 'auth.login.started') {
-    console.log('Open this URL to authenticate:');
-    console.log(msg.payload?.authUrl);
+    const authUrl = msg.payload?.authUrl;
+    if (authUrl) {
+      const opened = openUrl(authUrl);
+      if (!opened) {
+        console.log('Open this URL to authenticate:');
+        console.log(authUrl);
+      }
+    } else {
+      console.log('Open this URL to authenticate:');
+      console.log(authUrl);
+    }
     ws.close();
     return;
   }

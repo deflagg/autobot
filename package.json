@@ -1,16 +1,20 @@
 {
   "name": "autobot",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "build": "npm -ws run build",
-    "test": "npm -ws run test",
+    "build": "npm -w packages/core run build && npm -w packages/protocol run build && npm -w packages/daemon run build && npm -w packages/cli run build",
+    "test": "npm -w packages/core run test && npm -w packages/protocol run test && npm -w packages/daemon run test && npm -w packages/cli run test",
     "lint": "npm -ws run lint",
     "clean": "rimraf packages/*/dist",
-    "typecheck": "npm -ws run typecheck"
+    "typecheck": "npm -w packages/core run typecheck && npm -w packages/protocol run typecheck && npm -w packages/daemon run typecheck && npm -w packages/cli run typecheck"
   },
   "devDependencies": {
     "typescript": "^5.7.3",
-    "rimraf": "^5.0.7"
+    "rimraf": "^5.0.7",
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.12"
   }
 }

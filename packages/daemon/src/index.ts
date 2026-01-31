@@ -19,6 +19,7 @@ import {
   updateDir,
   updatesDir,
   ensureCleanTree,
+  appendAudit,
 } from '@autobot/core';
 import { createServer } from 'node:http';
 import { randomBytes, createHash } from 'node:crypto';
@@ -40,6 +41,7 @@ type LoopState = {
   maxMinutes?: number;
   startedAt: number;
   lastUpdateId?: string;
+  lastPatchHash?: string;
 };
 
 let loopState: LoopState | null = null;
@@ -72,7 +74,11 @@ async function createUpdateArtifacts(repoPath: string, goal: string) {
   writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
   writeFileSync(join(dir, 'patch.diff'), patch);
 
-  return { updateId, dir };
+  return { updateId, dir, patch };
+}
+
+function hash(str: string) {
+  return createHash('sha256').update(str).digest('hex');
 }
 
 export function startDaemon() {
@@ -97,8 +103,22 @@ export function startDaemon() {
       loopState.iteration += 1;
 
       // create update proposal (stub)
-      const { updateId } = await createUpdateArtifacts(cfg.repoPath, loopState.goal);
+      const { updateId, patch } = await createUpdateArtifacts(cfg.repoPath, loopState.goal);
       loopState.lastUpdateId = updateId;
+
+      // stagnation detection
+      const patchHash = hash(patch);
+      if (loopState.lastPatchHash && loopState.lastPatchHash === patchHash) {
+        loopState.running = false;
+        ws.send(JSON.stringify({
+          id: loopState.loopId,
+          type: 'loop.stopped',
+          ok: false,
+          error: { code: 'STAGNATION', message: 'Patch unchanged across iterations' },
+        }));
+        break;
+      }
+      loopState.lastPatchHash = patchHash;
 
       // apply
       let attempt = 0;
@@ -108,15 +128,17 @@ export function startDaemon() {
           await ensureCleanTree(cfg.repoPath, git);
           const dir = updateDir(cfg.repoPath, updateId);
           const patchPath = join(dir, 'patch.diff');
-          const patch = readFileSync(patchPath, 'utf8');
+          const patchText = readFileSync(patchPath, 'utf8');
 
-          await git.applyPatch(patch);
+          await git.applyPatch(patchText);
           await execa('npm', ['run', 'build'], { cwd: cfg.repoPath, stdio: 'inherit' });
           await execa('npm', ['test'], { cwd: cfg.repoPath, stdio: 'inherit' });
 
           await git.add('.');
           await git.commit(`autobot(loop:${loopState.loopId}): ${updateId}`);
           const head = await git.revparse(['HEAD']);
+
+          appendAudit({ type: 'loop.iteration.completed', loopId: loopState.loopId, updateId, commit: head });
 
           ws.send(JSON.stringify({
             id: loopState.loopId,
@@ -128,7 +150,6 @@ export function startDaemon() {
           applied = true;
           break;
         } catch (e: any) {
-          // rollback
           await git.reset(['--hard', 'HEAD']);
           ws.send(JSON.stringify({
             id: loopState.loopId,
@@ -148,10 +169,10 @@ export function startDaemon() {
     }
 
     ws.send(JSON.stringify({
-      id: loopState.loopId,
+      id: loopState?.loopId,
       type: 'loop.stopped',
       ok: true,
-      payload: { loopId: loopState.loopId },
+      payload: { loopId: loopState?.loopId },
     }));
   }
 
@@ -339,6 +360,8 @@ export function startDaemon() {
           await git.commit(`autobot(update): ${updateApply.data.payload.updateId}`);
           const head = await git.revparse(['HEAD']);
 
+          appendAudit({ type: 'update.applied', updateId: updateApply.data.payload.updateId, commit: head });
+
           ws.send(
             JSON.stringify({
               id: updateApply.data.id,
@@ -366,6 +389,7 @@ export function startDaemon() {
           const ref = updateRollback.data.payload.ref || 'HEAD~1';
           await git.reset(['--hard', ref]);
           const head = await git.revparse(['HEAD']);
+          appendAudit({ type: 'update.rolledBack', ref, head });
           ws.send(
             JSON.stringify({
               id: updateRollback.data.id,

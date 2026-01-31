@@ -1,0 +1,26 @@
+{
+  "name": "autobot",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Self-modifying CLI agent (local codegen self-updates).",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "node --watch dist/cli.js",
+    "start": "node dist/cli.js",
+    "lint": "node -c dist/cli.js || true",
+    "test": "node dist/cli.js doctor"
+  },
+  "bin": {
+    "autobot": "dist/cli.js"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "diff": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.2",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.3"
+  }
+}

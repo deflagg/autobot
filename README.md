@@ -3,8 +3,8 @@
 A from-scratch, rethink-first personal automation agent.
 
 ## Goals
-- Build a safer, more reliable “agent” architecture than typical LLM wrappers.
-- Strong auditability, policy gating, and resumable workflows.
+- Build a self-modifying CLI agent that can generate and apply local code changes on demand.
+- Provide guardrails: plan, diff, tests, commit, rollback.
 
 ## Repo navigation
 - `STATUS.md` — current state at a glance

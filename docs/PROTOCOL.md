@@ -129,3 +129,32 @@ These can occur during long operations like apply/verify.
   }
 }
 ```
+
+---
+
+## Auth management messages (MVP)
+
+### `auth.status.get`
+Client → server:
+```json
+{ "id": "<reqId>", "type": "auth.status.get" }
+```
+Server → client:
+```json
+{ "id": "<reqId>", "type": "auth.status.result", "ok": true, "payload": { "provider": "openai-codex", "configured": true, "refreshable": true } }
+```
+
+### `auth.import.openclaw`
+Client → server:
+```json
+{ "id": "<reqId>", "type": "auth.import.openclaw", "payload": { "path": "<optional>" } }
+```
+Server → client:
+```json
+{ "id": "<reqId>", "type": "auth.imported", "ok": true }
+```
+
+### Auth-related errors
+- `AUTH_REQUIRED`
+- `AUTH_EXPIRED`
+- `AUTH_IMPORT_FAILED`

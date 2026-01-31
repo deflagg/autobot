@@ -100,3 +100,29 @@ During apply, daemon runs from repo root:
 - Tool execution beyond repo edits
 - Memory/embeddings
 - Multi-user or remote access
+
+---
+
+## OpenAI Codex OAuth (required for MVP)
+
+The MVP must be able to authenticate to **OpenAI Codex** using **OAuth**, similar to OpenClaw.
+
+### Requirements
+- Autobot MUST support **OpenAI Codex OAuth** as the primary auth method for LLM calls.
+- Autobot MUST support a *reuse/import* path so users can leverage existing OpenClaw OAuth credentials, rather than implementing a full browser OAuth flow in v0.1.
+- OAuth tokens MUST be stored outside the repo, local-only, with restricted permissions.
+- Tokens MUST be redacted from logs and update artifacts.
+- Token refresh MUST be supported; if refresh fails, the daemon must surface a clear remediation path.
+
+### MVP approach (recommended)
+- Provide an auth import command that reads OpenClaw credentials and writes/links them into Autobot:
+  - `autobot auth import --from openclaw`
+  - `autobot auth status`
+
+### Storage
+- Autobot stores credentials at:
+  - `~/.autobot/credentials/oauth.json` (chmod 600)
+
+### Verification
+- `autobot doctor` includes an OAuth check (token present, refreshable).
+- `autobot update --goal ...` can successfully call the Codex model using OAuth.

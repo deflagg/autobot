@@ -1,6 +1,7 @@
 # Next
 
 ## P0 (now)
+- [ ] Add OpenAI Codex OAuth requirements (reuse/import OpenClaw credentials).
 - [ ] Review and approve docs/MVP.md and docs/PROTOCOL.md (massage requirements).
 - [ ] ADR: Approach B self-modification pipeline + safety gates.
 - [ ] Define minimal guardrails contract: plan → diff → apply → test → commit → restart.

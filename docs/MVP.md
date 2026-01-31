@@ -150,3 +150,43 @@ The MVP MUST provide a native login flow for OpenAI Codex OAuth.
 - Store credentials outside the repo:
   - `~/.autobot/credentials/openai-codex.oauth.json` (chmod 600)
 - Redact tokens from logs and update artifacts.
+
+---
+
+## Continuous self-update loop (required for MVP)
+
+Autobot must support a daemon-run **continuous update loop** that keeps generating and applying incremental updates toward a user goal until the user stops it.
+
+### CLI
+- `autobot loop start --goal "<text>" [--max-iterations N] [--max-minutes M] [--retry N]`
+- `autobot loop status`
+- `autobot loop stop`
+
+### Behavior
+- Loop runs inside the **daemon** as a background job.
+- Each iteration performs the standard update contract:
+  1) plan
+  2) patch
+  3) gates
+  4) apply
+  5) verify
+  6) commit
+- Each iteration produces its own `updateId` and its own commit.
+
+### Automatic apply authorization
+- Starting the loop is an explicit authorization to automatically apply updates within configured safety limits.
+
+### Failure handling (retry + rollback)
+- On verify failure, the daemon MUST:
+  - automatically rollback the working tree to the last known good commit (the pre-iteration HEAD)
+  - retry up to `retry` attempts per iteration (default TBD)
+- The loop MUST stop if:
+  - retries are exhausted
+  - stagnation detected (no meaningful diff)
+  - max-iterations reached
+  - max-minutes reached
+  - user requests stop
+
+### Auditability
+- Loop state is persisted, e.g. under `loops/<loopId>/state.json`, and references per-iteration `updates/<updateId>/...` artifacts.
+- Commit messages include `loopId` and iteration number.

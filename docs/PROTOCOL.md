@@ -191,3 +191,42 @@ Server → client:
 ```json
 { "id": "<reqId>", "type": "auth.login.completed", "ok": true }
 ```
+
+---
+
+## Loop control messages (MVP)
+
+### `loop.start`
+Client → server:
+```json
+{ "id": "<reqId>", "type": "loop.start", "payload": { "goal": "...", "maxIterations": 20, "maxMinutes": 60, "retry": 2 } }
+```
+Server → client:
+```json
+{ "id": "<reqId>", "type": "loop.started", "ok": true, "payload": { "loopId": "<loopId>" } }
+```
+
+### `loop.status.get`
+Client → server:
+```json
+{ "id": "<reqId>", "type": "loop.status.get", "payload": { "loopId": "<loopId>" } }
+```
+Server → client:
+```json
+{ "id": "<reqId>", "type": "loop.status.result", "ok": true, "payload": { "loopId": "<loopId>", "state": "running|stopped|failed", "iteration": 3, "lastUpdateId": "<updateId>" } }
+```
+
+### `loop.stop`
+Client → server:
+```json
+{ "id": "<reqId>", "type": "loop.stop", "payload": { "loopId": "<loopId>" } }
+```
+Server → client:
+```json
+{ "id": "<reqId>", "type": "loop.stopped", "ok": true }
+```
+
+### Streaming events
+- `loop.progress` — stage/iteration progress
+- `loop.iteration.completed` — per iteration summary
+- `loop.iteration.failed` — includes retry count and rollback action

@@ -20,6 +20,24 @@ function openUrl(url: string) {
   }
 }
 
+function systemctl(cmd: string) {
+  execSync(`systemctl --user ${cmd} autobot`, { stdio: 'inherit' });
+}
+
+if (args[0] === 'daemon' || args[0] === 'service') {
+  const action = args[1];
+  if (!action) {
+    console.error('Usage: autobot daemon <start|stop|restart|status|logs>');
+    process.exit(1);
+  }
+  if (action === 'logs') {
+    execSync('journalctl --user -u autobot -f --no-pager', { stdio: 'inherit' });
+    process.exit(0);
+  }
+  systemctl(action);
+  process.exit(0);
+}
+
 const ws = new WebSocket(url);
 const id = String(Date.now());
 

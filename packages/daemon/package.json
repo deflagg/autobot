@@ -9,5 +9,16 @@
     "test": "echo 'no tests'",
     "lint": "echo 'no lint'",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@autobot/core": "0.0.1",
+    "@autobot/protocol": "0.0.1",
+    "execa": "^9.6.1",
+    "simple-git": "^3.30.0",
+    "ulid": "^3.0.2",
+    "ws": "^8.18.0"
+  },
+  "bin": {
+    "autobot-daemon": "dist/entry.js"
   }
 }

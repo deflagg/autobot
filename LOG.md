@@ -19,6 +19,7 @@
 - Added daemon PID lock to prevent port collisions.
 - Verified end-to-end auth login (loopback + event completion).
 - Cleaned test artifacts (dist outputs, temp files) and reset config to defaults.
+- Added chat loop + safety allowlist/denylist; smoke test passed.
 - Build ran clean.
 
 ## 2026-01-30

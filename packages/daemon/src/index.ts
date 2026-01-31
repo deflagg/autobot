@@ -18,7 +18,7 @@ import {
   updateDir,
   updatesDir,
   ensureCleanTree,
-  ensurePatchPathsAllowed,
+  ensureChangePathsAllowed,
   appendAudit,
   DEFAULT_PROVIDER_ID,
   isProviderId,
@@ -58,13 +58,13 @@ async function createUpdateArtifacts(repoPath: string, goal: string) {
 
   const request = { id: updateId, goal, createdAt: new Date().toISOString() };
   const plan = { goal, steps: ['(stub) derive plan from goal'] };
-  const patch = `# patch for ${updateId}\n# (stub)\n`;
+  const change = `# change for ${updateId}\n# (stub)\n`;
 
   writeFileSync(join(dir, 'request.json'), JSON.stringify(request, null, 2));
   writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
-  writeFileSync(join(dir, 'patch.diff'), patch);
+  writeFileSync(join(dir, 'change.diff'), change);
 
-  return { updateId, dir, patch };
+  return { updateId, dir, change };
 }
 
 function hash(str: string) {
@@ -135,11 +135,11 @@ export function startDaemon() {
 
       loopState.iteration += 1;
 
-      const { updateId, patch } = await createUpdateArtifacts(cfg.repoPath, loopState.goal);
+      const { updateId, change } = await createUpdateArtifacts(cfg.repoPath, loopState.goal);
       loopState.lastUpdateId = updateId;
 
-      const patchHash = hash(patch);
-      if (loopState.lastPatchHash && loopState.lastPatchHash === patchHash) {
+      const changeHash = hash(change);
+      if (loopState.lastPatchHash && loopState.lastPatchHash === changeHash) {
         loopState.running = false;
         ws.send(JSON.stringify({
           id: loopState.loopId,
@@ -149,7 +149,7 @@ export function startDaemon() {
         }));
         break;
       }
-      loopState.lastPatchHash = patchHash;
+      loopState.lastPatchHash = changeHash;
 
       let attempt = 0;
       let applied = false;
@@ -157,12 +157,12 @@ export function startDaemon() {
         try {
           await ensureCleanTree(cfg.repoPath, git);
           const dir = updateDir(cfg.repoPath, updateId);
-          const patchPath = join(dir, 'patch.diff');
-          const patchText = readFileSync(patchPath, 'utf8');
+          const changePath = existsSync(join(dir, 'change.diff')) ? join(dir, 'change.diff') : join(dir, 'patch.diff');
+          const changeText = readFileSync(changePath, 'utf8');
 
-          ensurePatchPathsAllowed(cfg.repoPath, patchText, cfg.safety?.allowlist, cfg.safety?.denylist);
+          ensureChangePathsAllowed(cfg.repoPath, changeText, cfg.safety?.allowlist, cfg.safety?.denylist);
 
-          await git.applyPatch(patchText);
+          await git.applyPatch(changeText);
           await execa('npm', ['run', 'build'], { cwd: cfg.repoPath, stdio: 'inherit' });
           await execa('npm', ['test'], { cwd: cfg.repoPath, stdio: 'inherit' });
 
@@ -424,12 +424,12 @@ export function startDaemon() {
         try {
           await ensureCleanTree(cfg.repoPath, git);
           const dir = updateDir(cfg.repoPath, updateApply.data.payload.updateId);
-          const patchPath = join(dir, 'patch.diff');
-          const patch = readFileSync(patchPath, 'utf8');
+          const changePath = existsSync(join(dir, 'change.diff')) ? join(dir, 'change.diff') : join(dir, 'patch.diff');
+          const change = readFileSync(changePath, 'utf8');
 
-          ensurePatchPathsAllowed(cfg.repoPath, patch, cfg.safety?.allowlist, cfg.safety?.denylist);
+          ensureChangePathsAllowed(cfg.repoPath, change, cfg.safety?.allowlist, cfg.safety?.denylist);
 
-          await git.applyPatch(patch);
+          await git.applyPatch(change);
           await execa('npm', ['run', 'build'], { cwd: cfg.repoPath, stdio: 'inherit' });
           await execa('npm', ['test'], { cwd: cfg.repoPath, stdio: 'inherit' });
 

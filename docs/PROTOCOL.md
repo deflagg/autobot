@@ -111,7 +111,7 @@ These can occur during long operations like apply/verify.
 
 ### `update.progress`
 ```json
-{ "id": "<reqId>", "type": "update.progress", "payload": { "stage": "plan|patch|gate|apply|verify|commit", "percent": 42 } }
+{ "id": "<reqId>", "type": "update.progress", "payload": { "stage": "plan|change|gate|apply|verify|commit", "percent": 42 } }
 ```
 
 ### `verify.output`
@@ -140,7 +140,7 @@ These can occur during long operations like apply/verify.
 ### `auth.status.get`
 Client → server:
 ```json
-{ "id": "<reqId>", "type": "auth.status.get" }
+{ "id": "<reqId>", "type": "auth.status.get", "payload": { "providerId": "openai-codex-oauth" } }
 ```
 Server → client:
 ```json
@@ -149,10 +149,11 @@ Server → client:
   "type": "auth.status.result",
   "ok": true,
   "payload": {
-    "provider": "openai-codex",
+    "providerId": "openai-codex-oauth",
     "configured": true,
     "refreshable": true,
     "expired": false,
+    "expiresAt": 1770750639804,
     "refreshError": null
   }
 }
@@ -165,7 +166,7 @@ Server → client:
 ### `auth.login.start`
 Client → server:
 ```json
-{ "id": "<reqId>", "type": "auth.login.start" }
+{ "id": "<reqId>", "type": "auth.login.start", "payload": { "providerId": "openai-codex-oauth" } }
 ```
 Server → client:
 ```json
@@ -174,8 +175,9 @@ Server → client:
   "type": "auth.login.started",
   "ok": true,
   "payload": {
+    "providerId": "openai-codex-oauth",
     "authUrl": "https://...",
-    "callbackUrl": "http://127.0.0.1:<port>/oauth/callback",
+    "callbackUrl": "http://127.0.0.1:<port>/auth/callback",
     "state": "...",
     "pkce": { "method": "S256" }
   }
@@ -185,11 +187,17 @@ Server → client:
 ### `auth.login.complete` (fallback)
 Client → server:
 ```json
-{ "id": "<reqId>", "type": "auth.login.complete", "payload": { "code": "...", "state": "..." } }
+{ "id": "<reqId>", "type": "auth.login.complete", "payload": { "providerId": "openai-codex-oauth", "redirectUrl": "http://localhost:1455/auth/callback?..." } }
 ```
 Server → client:
 ```json
 { "id": "<reqId>", "type": "auth.login.completed", "ok": true }
+```
+
+### `auth.login.completed` (event)
+Server → client (event):
+```json
+{ "id": "auth.login.completed", "type": "auth.login.completed", "ok": true, "payload": { "providerId": "openai-codex-oauth" } }
 ```
 
 ---
@@ -230,4 +238,4 @@ Server → client:
 - `loop.progress` — stage/iteration progress
 - `loop.iteration.completed` — per iteration summary
 - `loop.iteration.failed` — includes retry count and rollback action
-- `loop.retrying` — indicates rollback completed and a new plan/patch generation has started
+- `loop.retrying` — indicates rollback completed and a new plan/change generation has started

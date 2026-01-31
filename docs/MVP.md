@@ -13,8 +13,7 @@ This MVP focuses on proving the *self-edit loop* is safe, testable, auditable, a
 
 ## Core components
 1) **Daemon** (always-on)
-   - owns update lifecycle: plan → patch → apply → verify → commit → rollback
-   - exposes a local WS API
+   - owns update lifecycle: plan → change → apply → verify → commit → rollback   - exposes a local WS API
 2) **CLI** (thin client)
    - connects to daemon
    - sends typed requests
@@ -55,12 +54,12 @@ Input: goal text.
 Output artifacts under repo:
 - `updates/<updateId>/request.json`
 - `updates/<updateId>/plan.json`
-- `updates/<updateId>/patch.diff`
+- `updates/<updateId>/change.diff`
 
 ### Phase B: Apply (`apply`)
 Steps:
 1) gate checks
-2) apply patch
+2) apply change
 3) verify
 4) commit
 
@@ -96,7 +95,7 @@ During apply, daemon runs from repo root:
 
 ## Auditability (required)
 - Every update is recorded in `updates/<updateId>/...`
-- Daemon streams progress events during plan/patch/apply/verify/commit.
+- Daemon streams progress events during plan/change/apply/verify/commit.
 
 ## MVP acceptance test
 1) Install and start the systemd user service.
@@ -181,7 +180,7 @@ Autobot must support a daemon-run **continuous update loop** that keeps generati
 - Loop runs inside the **daemon** as a background job.
 - Each iteration performs the standard update contract:
   1) plan
-  2) patch
+  2) change
   3) gates
   4) apply
   5) verify
@@ -194,7 +193,7 @@ Autobot must support a daemon-run **continuous update loop** that keeps generati
 ### Failure handling (retry + rollback)
 - On verify failure, the daemon MUST:
   - automatically rollback the working tree to the last known good commit (the pre-iteration HEAD)
-  - for each retry attempt: regenerate a NEW plan+patch using the failure context (do not blindly reapply the same diff)
+  - for each retry attempt: regenerate a NEW plan+change using the failure context (do not blindly reapply the same diff)
   - retry up to `retry` attempts per iteration (default TBD)
 - The loop MUST stop if:
   - retries are exhausted

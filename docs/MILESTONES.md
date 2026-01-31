@@ -17,9 +17,9 @@
 - Token storage + refresh
 
 ## M3 — Update contract v0
-- `update.create` produces plan+patch artifacts
+- `update.create` produces plan+change artifacts
 - `update.apply` validates gates
-- Apply patch, verify, commit
+- Apply change, verify, commit
 - `rollback` command
 
 ## M4 — Continuous loop

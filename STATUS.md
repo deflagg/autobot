@@ -17,6 +17,7 @@ v0.1 core implementation complete (Iterations 0–8). Now hardening OAuth/auth a
 - Provider-based auth implementation (Iterations A–D complete)
 - Added daemon PID lock to prevent port collisions
 - End-to-end auth login verified (event-based + loopback)
+- Chat loop + safety allowlist/denylist added
 
 ## Next (top 5)
 See `NEXT.md`.

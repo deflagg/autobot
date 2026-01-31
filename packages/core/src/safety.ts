@@ -35,9 +35,9 @@ export function isPathAllowed(repoPath: string, targetPath: string, allowlist: s
   return true;
 }
 
-export function extractPatchPaths(patchText: string): string[] {
+export function extractChangePaths(changeText: string): string[] {
   const paths = new Set<string>();
-  for (const line of patchText.split('\n')) {
+  for (const line of changeText.split('\n')) {
     if (line.startsWith('+++ b/')) {
       const p = line.slice(6).trim();
       if (p && p !== '/dev/null') paths.add(p);
@@ -50,8 +50,8 @@ export function extractPatchPaths(patchText: string): string[] {
   return Array.from(paths);
 }
 
-export function ensurePatchPathsAllowed(repoPath: string, patchText: string, allowlist: string[] = [], denylist: string[] = DEFAULT_DENYLIST) {
-  const paths = extractPatchPaths(patchText);
+export function ensureChangePathsAllowed(repoPath: string, changeText: string, allowlist: string[] = [], denylist: string[] = DEFAULT_DENYLIST) {
+  const paths = extractChangePaths(changeText);
   for (const p of paths) {
     const full = resolve(repoPath, p);
     if (!isPathAllowed(repoPath, full, allowlist, denylist)) {

@@ -65,7 +65,7 @@ Exit criteria:
 
 Deliverables:
 - `update.create` creates:
-  - `request.json`, `plan.json`, `patch.diff`
+  - `request.json`, `plan.json`, `change.diff`
 - Plan/diff stored under `updates/<id>/...`
 
 Exit criteria:
@@ -79,7 +79,7 @@ Exit criteria:
 
 Deliverables:
 - Gates enforced (denylist, clean tree, size caps)
-- Apply patch, run verify (`npm test`, `npm run build`)
+- Apply change, run verify (`npm test`, `npm run build`)
 - Commit + rollback command
 
 Exit criteria:
@@ -93,8 +93,7 @@ Exit criteria:
 
 Deliverables:
 - `loop.start/status/stop`
-- Retry regenerates plan/patch
-- Loop state persisted
+- Retry regenerates plan/change- Loop state persisted
 
 Exit criteria:
 - `loop.start` runs multiple iterations

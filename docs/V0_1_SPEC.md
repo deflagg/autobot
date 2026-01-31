@@ -93,13 +93,12 @@ Auth: daemon-owned OAuth callback listener (HTTP loopback).
 Artifacts:
 - `updates/<id>/request.json`
 - `updates/<id>/plan.json`
-- `updates/<id>/patch.diff`
+- `updates/<id>/change.diff`
 
 ### Phase B: Apply (`update.apply`)
 Steps:
 1) gate checks
-2) apply patch
-3) verify (npm test + build)
+2) apply change3) verify (npm test + build)
 4) commit
 5) write `verify.json`, `commit.txt`
 
@@ -117,11 +116,9 @@ Steps:
 
 ## Continuous update loop (v0.1)
 - `loop.start` authorizes auto-apply within safety limits
-- Each iteration: plan → patch → apply → verify → commit
-- On verify failure:
+- Each iteration: plan → change → apply → verify → commit- On verify failure:
   - rollback to pre-iteration HEAD
-  - **regenerate new plan/patch** using failure context
-  - retry up to `retry` times
+  - **regenerate new plan/change** using failure context  - retry up to `retry` times
 - Auto-stop on: max-iterations, max-minutes, stagnation, retry exhaustion, or user stop
 
 ---

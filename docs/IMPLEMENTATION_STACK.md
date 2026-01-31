@@ -23,7 +23,7 @@ Source: `temp_impstack.txt` (imported into docs on 2026-01-31).
 - Stream logs/events over WS
 - Commands map 1:1 to protocol (`status.get`, `doctor.run`, `update.create/apply/rollback`, loop start/stop/status)
 
-## Git + patching
+## Git + changes
 - Use `git worktree add` to an ephemeral dir
 - `git apply` for unified diffs
 - Verify → commit → fast-forward HEAD

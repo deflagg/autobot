@@ -157,7 +157,7 @@ export function startDaemon() {
         try {
           await ensureCleanTree(cfg.repoPath, git);
           const dir = updateDir(cfg.repoPath, updateId);
-          const changePath = existsSync(join(dir, 'change.diff')) ? join(dir, 'change.diff') : join(dir, 'patch.diff');
+          const changePath = join(dir, 'change.diff');
           const changeText = readFileSync(changePath, 'utf8');
 
           ensureChangePathsAllowed(cfg.repoPath, changeText, cfg.safety?.allowlist, cfg.safety?.denylist);
@@ -424,7 +424,7 @@ export function startDaemon() {
         try {
           await ensureCleanTree(cfg.repoPath, git);
           const dir = updateDir(cfg.repoPath, updateApply.data.payload.updateId);
-          const changePath = existsSync(join(dir, 'change.diff')) ? join(dir, 'change.diff') : join(dir, 'patch.diff');
+          const changePath = join(dir, 'change.diff');
           const change = readFileSync(changePath, 'utf8');
 
           ensureChangePathsAllowed(cfg.repoPath, change, cfg.safety?.allowlist, cfg.safety?.denylist);

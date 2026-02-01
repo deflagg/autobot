@@ -100,8 +100,13 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
     }),
   });
 
-  const json = await resp.json();
-  if (!resp.ok) throw new Error(`LLM request failed: ${json?.error?.message || json?.error || resp.statusText}`);
+  const textBody = await resp.text();
+  let json: any = null;
+  try { json = JSON.parse(textBody); } catch {}
+  if (!resp.ok) {
+    const detail = json?.error?.message || json?.error || textBody || resp.statusText;
+    throw new Error(`LLM request failed: ${detail}`);
+  }
 
   const text =
     json?.output_text ||

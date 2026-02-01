@@ -49,8 +49,8 @@ const ws = new WebSocket(url);
 const id = String(Date.now());
 let chatCounter = 0;
 const chatMode = args[0] === 'chat';
-const askApply = chatMode && args.includes('--ask');
-const autoApply = chatMode && !askApply; // default: auto-apply
+const askApply = chatMode && !args.includes('--apply');
+const autoApply = chatMode && args.includes('--apply'); // opt-in auto-apply
 
 ws.on('open', () => {
   send(ws, { id: `${id}-auth`, type: 'auth', payload: { token: cfg.auth.token } });

@@ -93,7 +93,7 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
     body: JSON.stringify({
       model,
       instructions: system,
-      input: user,
+      input: [{ role: 'user', content: user }],
       temperature: 0.2,
     }),
   });

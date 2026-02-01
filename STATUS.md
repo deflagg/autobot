@@ -6,21 +6,15 @@ v0.1 core implementation complete (Iterations 0–8). Now hardening OAuth/auth a
 ## What works
 - Monorepo packages: `cli`, `daemon`, `protocol`, `core`
 - Daemon WS server + auth token gate
-- Update flow: create → apply → verify → commit → rollback
-- Continuous loop: start/status/stop with rollback+retry + stagnation detection
-- Installer + systemd user service wrapper
+- Chat-only UX (prompts → assistant response)
 - OAuth login start + status, daemon-owned callback, PKCE helpers
+- Auth token sink + refresh/lock in `~/.autobot/auth-profiles.json`
 - `autobot doctor` checks (oauth config/tokens, git clean)
-- Audit logging utilities
+- Installer + systemd user service wrapper
 
 ## In progress
-- Auth storage migrated to auth-profiles.json (token sink + lock)
-- Codex endpoint integration hardening (response parsing, defaults)
-- End-to-end auth login verified (event-based + loopback)
-- Chat + safety allowlist/denylist added
-- Chat-only UX: remove update/apply/loop CLI commands, auto-apply in chat
-- Renamed patch artifacts to change (no fallback)
-- LLM integration wired into update.create/loop (direct HTTP, no SDK)
+- Codex backend integration hardening (SSE parsing + response shape)
+- End-to-end chat response test on a clean config
 
 ## Next (top 5)
 See `NEXT.md`.

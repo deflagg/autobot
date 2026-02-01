@@ -1,11 +1,9 @@
 # Next
 
 ## P0 (now)
-- [ ] Verify auth login on a clean config (no oauth overrides) with auth-profiles.json.
-- [ ] Validate Codex endpoint request/response shape end-to-end.
+- [ ] Verify auth login + chat response on a clean config.
+- [ ] Validate Codex SSE response parsing with a few prompts.
 - [ ] Re-run tests/build as needed.
-- [ ] Confirm chat-only UX behavior end-to-end (no loop/update/apply commands).
 
 ## P1
-- [ ] Add `autobot chat` interactive loop (local) as the user interface.
-- [ ] Add file-level allowlist for self-edits (e.g., forbid editing `.env`, `.git/`).
+- [ ] Add file-level allowlist for self-edits (if we reintroduce self-editing).

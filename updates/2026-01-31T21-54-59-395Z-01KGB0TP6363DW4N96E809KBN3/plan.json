@@ -1,6 +1,0 @@
-{
-  "goal": "hello smoke test",
-  "steps": [
-    "(stub) derive plan from goal"
-  ]
-}

@@ -61,7 +61,7 @@ autobot chat
 ```
 (Type a prompt per line; `exit` to quit.)
 
-Chat responds like a normal assistant. No plan/diff or apply steps.
+Chat responds like a normal assistant. No plan/diff/apply steps.
 
 Safety config (optional):
 ```json

@@ -28,6 +28,10 @@
 - Provider now saves accountId (best-effort) from access token.
 - Codex endpoint response parsing hardened.
 - Switched to chat-only UX: chat auto-applies; update/apply/loop commands removed from CLI.
+- Codex backend: model set to gpt-5.2, instructions/input list, store=false, stream=true + SSE parsing.
+- Simplified chat to basic assistant responses (no plan/diff/apply).
+- Removed loop handling from daemon.
+- End-to-end chat test returned a valid response.
 
 ## 2026-01-30
 - Initialized repository scaffold: README/STATUS/NEXT/HANDOFF/DECISIONS/LOG.

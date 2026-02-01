@@ -56,6 +56,11 @@ autobot chat
 ```
 (Type a goal per line; `exit` to quit.)
 
+Auto-apply each update:
+```bash
+autobot chat --apply
+```
+
 Safety config (optional):
 ```json
 {

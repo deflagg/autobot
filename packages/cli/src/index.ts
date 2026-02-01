@@ -49,6 +49,7 @@ const ws = new WebSocket(url);
 const id = String(Date.now());
 let chatCounter = 0;
 const chatMode = args[0] === 'chat';
+const autoApply = chatMode && args.includes('--apply');
 
 ws.on('open', () => {
   send(ws, { id: `${id}-auth`, type: 'auth', payload: { token: cfg.auth.token } });
@@ -196,6 +197,10 @@ ws.on('message', (data: WebSocket.RawData) => {
 
   if (msg.type === 'update.created') {
     console.log(JSON.stringify(msg.payload, null, 2));
+    if (chatMode && autoApply && msg.payload?.updateId) {
+      send(ws, { id: `${Date.now()}-${chatCounter++}`, type: 'update.apply', payload: { updateId: msg.payload.updateId } });
+      return;
+    }
     if (!chatMode) ws.close();
     return;
   }

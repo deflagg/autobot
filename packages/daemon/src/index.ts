@@ -87,7 +87,7 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Accept: 'application/json',
+      Accept: 'text/event-stream',
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
@@ -96,23 +96,49 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
       input: [{ role: 'user', content: user }],
       temperature: 0.2,
       store: false,
+      stream: true,
     }),
   });
 
-  const textBody = await resp.text();
-  let json: any = null;
-  try { json = JSON.parse(textBody); } catch {}
   if (!resp.ok) {
+    const textBody = await resp.text();
+    let json: any = null;
+    try { json = JSON.parse(textBody); } catch {}
     const detail = json?.error?.message || json?.error || textBody || resp.statusText;
     throw new Error(`LLM request failed: ${detail}`);
   }
 
-  const text =
-    json?.output_text ||
-    json?.response?.output_text ||
-    json?.output?.[0]?.content?.[0]?.text ||
-    json?.choices?.[0]?.message?.content ||
-    '';
+  if (!resp.body) throw new Error('LLM response missing body');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let text = '';
+
+  for await (const chunk of resp.body) {
+    buffer += decoder.decode(chunk, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf('\n\n')) !== -1) {
+      const event = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+
+      const line = event.split('\n').find((l) => l.startsWith('data:'));
+      if (!line) continue;
+      const data = line.replace(/^data:\s*/, '').trim();
+      if (!data || data === '[DONE]') continue;
+
+      let payload: any = null;
+      try { payload = JSON.parse(data); } catch { continue; }
+
+      const delta =
+        payload?.output_text ||
+        payload?.response?.output_text ||
+        payload?.output?.[0]?.content?.[0]?.text ||
+        payload?.choices?.[0]?.message?.content ||
+        payload?.delta?.content ||
+        '';
+      if (delta) text += delta;
+    }
+  }
   const planRaw = extractBetween(text, '<PLAN_JSON>', '</PLAN_JSON>');
   const changeRaw = extractBetween(text, '<CHANGE_DIFF>', '</CHANGE_DIFF>');
   if (!planRaw || !changeRaw) throw new Error('LLM output missing plan or change');

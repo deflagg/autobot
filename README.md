@@ -54,12 +54,9 @@ Chat loop:
 ```bash
 autobot chat
 ```
-(Type a goal per line; `exit` to quit.)
+(Type a prompt per line; `exit` to quit.)
 
-Auto-apply each update:
-```bash
-autobot chat --apply
-```
+Chat automatically generates + applies + tests + commits each update.
 
 Safety config (optional):
 ```json

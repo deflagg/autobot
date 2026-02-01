@@ -49,7 +49,7 @@ const ws = new WebSocket(url);
 const id = String(Date.now());
 let chatCounter = 0;
 const chatMode = args[0] === 'chat';
-const autoApply = chatMode && args.includes('--apply');
+const autoApply = chatMode; // always auto-apply in chat mode
 
 ws.on('open', () => {
   send(ws, { id: `${id}-auth`, type: 'auth', payload: { token: cfg.auth.token } });
@@ -113,31 +113,7 @@ ws.on('message', (data: WebSocket.RawData) => {
       send(ws, { id, type: 'doctor.run' });
       return;
     }
-    if (args[0] === 'update') {
-      const goal = args.slice(1).join(' ').trim();
-      if (!goal) {
-        console.error('Usage: autobot update <goal>');
-        ws.close();
-        return;
-      }
-      send(ws, { id, type: 'update.create', payload: { goal } });
-      return;
-    }
-    if (args[0] === 'apply') {
-      const updateId = args[1];
-      if (!updateId) {
-        console.error('Usage: autobot apply <updateId>');
-        ws.close();
-        return;
-      }
-      send(ws, { id, type: 'update.apply', payload: { updateId } });
-      return;
-    }
-    if (args[0] === 'rollback') {
-      const ref = args[1];
-      send(ws, { id, type: 'update.rollback', payload: { ref } });
-      return;
-    }
+    // update/apply/rollback commands removed (chat-only UX)
     if (args[0] === 'loop' && args[1] === 'start') {
       const goal = args.slice(2).join(' ').trim();
       if (!goal) {

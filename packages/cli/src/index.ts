@@ -31,7 +31,7 @@ function systemctl(cmd: string) {
   execSync(`systemctl --user ${cmd} autobot`, { stdio: 'inherit' });
 }
 
-if (args[0] === 'daemon' || args[0] === 'service') {
+if (args[0] === 'daemon') {
   const action = args[1];
   if (!action) {
     console.error('Usage: autobot daemon <start|stop|restart|status|logs>');

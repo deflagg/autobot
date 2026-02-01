@@ -82,6 +82,11 @@ LLM config (optional):
 }
 ```
 
+Daemon control:
+```bash
+autobot daemon <start|stop|restart|status|logs>
+```
+
 Daemon PID lock: the daemon writes `~/.autobot/daemon.pid` and refuses to start if a daemon is already running.
 
 ## Design docs

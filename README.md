@@ -3,15 +3,15 @@
 A from-scratch, rethink-first personal automation agent.
 
 ## Goals
-- Build a self-modifying CLI agent that can generate and apply local code changes on demand.
-- Provide guardrails: plan, diff, tests, commit, rollback.
+- Local-first CLI + daemon for a straightforward chat experience (v0.1).
+- OAuth login + token refresh with durable state.
+- Guardrails for safe changes (present in code, not exposed in chat UX).
 
 ## Repo navigation
 - `STATUS.md` — current state at a glance
 - `NEXT.md` — prioritized task queue
-- `HANDOFF.md` — how another agent can continue immediately
-- `DECISIONS.md` — key architecture decisions (why, not just what)
 - `LOG.md` — chronological progress log
+- `docs/` — architecture + protocol docs
 
 ## Getting started
 
@@ -96,9 +96,14 @@ autobot daemon <start|stop|restart|status|logs>
 Daemon PID lock: the daemon writes `~/.autobot/daemon.pid` and refuses to start if a daemon is already running.
 
 ## Design docs
-- [v0.1 Spec](docs/V0_1_SPEC.md)
-- [Protocol](docs/PROTOCOL.md)
-- [Installer](docs/INSTALLER.md)
-- [Implementation stack](docs/IMPLEMENTATION_STACK.md)
-- [Milestones](docs/MILESTONES.md)
-- [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
+- [Overview](docs/00_OVERVIEW.md)
+- [Architecture](docs/01_ARCHITECTURE.md)
+- [Components](docs/02_COMPONENTS.md)
+- [Data flows](docs/03_DATA_FLOWS.md)
+- [State & storage](docs/04_STATE_STORAGE.md)
+- [Security model](docs/05_SECURITY_MODEL.md)
+- [Deployment](docs/06_DEPLOYMENT.md)
+- [Protocol](docs/07_PROTOCOL.md)
+- [Decisions](docs/08_DECISIONS.md)
+- [Roadmap](docs/09_ROADMAP.md)
+- [Reference](docs/10_REFERENCE.md)

@@ -115,30 +115,7 @@ ws.on('message', (data: WebSocket.RawData) => {
       return;
     }
     // update/apply/rollback commands removed (chat-only UX)
-    if (args[0] === 'loop' && args[1] === 'start') {
-      const goal = args.slice(2).join(' ').trim();
-      if (!goal) {
-        console.error('Usage: autobot loop start <goal>');
-        ws.close();
-        return;
-      }
-      send(ws, { id, type: 'loop.start', payload: { goal } });
-      return;
-    }
-    if (args[0] === 'loop' && args[1] === 'status') {
-      send(ws, { id, type: 'loop.status.get' });
-      return;
-    }
-    if (args[0] === 'loop' && args[1] === 'stop') {
-      const loopId = args[2];
-      if (!loopId) {
-        console.error('Usage: autobot loop stop <loopId>');
-        ws.close();
-        return;
-      }
-      send(ws, { id, type: 'loop.stop', payload: { loopId } });
-      return;
-    }
+    // loop commands removed (chat-only UX)
     // default: status
     send(ws, { id, type: 'status.get' });
     return;
@@ -209,13 +186,7 @@ ws.on('message', (data: WebSocket.RawData) => {
     return;
   }
 
-  if (msg.type === 'loop.started' || msg.type === 'loop.status.result' || msg.type === 'loop.iteration.completed' || msg.type === 'loop.iteration.failed' || msg.type === 'loop.stopped') {
-    console.log(JSON.stringify(msg, null, 2));
-    if (msg.type === 'loop.started' || msg.type === 'loop.status.result') {
-      ws.close();
-    }
-    return;
-  }
+  // loop events ignored (chat-only UX)
 
   if (msg.type === 'doctor.result') {
     console.log(JSON.stringify(msg.payload, null, 2));

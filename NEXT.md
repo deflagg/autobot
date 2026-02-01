@@ -4,7 +4,7 @@
 - [ ] Verify auth login on a clean config (no oauth overrides) with auth-profiles.json.
 - [ ] Validate Codex endpoint request/response shape end-to-end.
 - [ ] Re-run tests/build as needed.
-- [ ] Confirm chat-only UX behavior end-to-end.
+- [ ] Confirm chat-only UX behavior end-to-end (no loop/update/apply commands).
 
 ## P1
 - [ ] Add `autobot chat` interactive loop (local) as the user interface.

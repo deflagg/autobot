@@ -50,7 +50,7 @@ Run doctor checks:
 autobot doctor
 ```
 
-Chat loop:
+Chat:
 ```bash
 autobot chat
 ```

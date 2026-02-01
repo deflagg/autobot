@@ -17,8 +17,8 @@ v0.1 core implementation complete (Iterations 0–8). Now hardening OAuth/auth a
 - Auth storage migrated to auth-profiles.json (token sink + lock)
 - Codex endpoint integration hardening (response parsing, defaults)
 - End-to-end auth login verified (event-based + loopback)
-- Chat loop + safety allowlist/denylist added
-- Chat-only UX: remove update/apply CLI commands, auto-apply in chat
+- Chat + safety allowlist/denylist added
+- Chat-only UX: remove update/apply/loop CLI commands, auto-apply in chat
 - Renamed patch artifacts to change (no fallback)
 - LLM integration wired into update.create/loop (direct HTTP, no SDK)
 

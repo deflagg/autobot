@@ -27,7 +27,7 @@
 - Implemented auth-profiles token sink + lock + legacy import.
 - Provider now saves accountId (best-effort) from access token.
 - Codex endpoint response parsing hardened.
-- Switched to chat-only UX: chat auto-applies, update/apply commands removed from CLI.
+- Switched to chat-only UX: chat auto-applies; update/apply/loop commands removed from CLI.
 
 ## 2026-01-30
 - Initialized repository scaffold: README/STATUS/NEXT/HANDOFF/DECISIONS/LOG.

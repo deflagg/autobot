@@ -80,8 +80,8 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
   const model = cfg.llm?.model || 'gpt-5.2';
   const endpoint = cfg.llm?.endpoint || 'https://chatgpt.com/backend-api/codex/responses';
 
-  const system = `You are Codex, based on GPT-5. You are running as a coding agent in the Codex CLI on a user's machine. Produce two artifacts: a JSON plan and a unified diff. Use the strict tags <PLAN_JSON>...</PLAN_JSON> and <CHANGE_DIFF>...</CHANGE_DIFF>. The diff must be relative to repo root.`;
-  const user = `Goal: ${goal}`;
+  const system = `You are a helpful assistant in a chat. Respond directly to the user's prompt.`;
+  const user = goal;
 
   const resp = await fetch(endpoint, {
     method: 'POST',
@@ -138,12 +138,7 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
       if (delta) text += delta;
     }
   }
-  const planRaw = extractBetween(text, '<PLAN_JSON>', '</PLAN_JSON>');
-  const changeRaw = extractBetween(text, '<CHANGE_DIFF>', '</CHANGE_DIFF>');
-  if (!planRaw || !changeRaw) throw new Error('LLM output missing plan or change');
-
-  const plan = JSON.parse(planRaw);
-  return { plan, change: changeRaw, model };
+  return { text, model };
 }
 
 export function startDaemon() {
@@ -197,94 +192,12 @@ export function startDaemon() {
 
   async function runLoop(ws: import('ws').WebSocket) {
     if (!loopState) return;
-
-    while (loopState.running) {
-      if (loopState.maxIterations && loopState.iteration >= loopState.maxIterations) {
-        loopState.running = false;
-        break;
-      }
-      if (loopState.maxMinutes && (Date.now() - loopState.startedAt) / 60000 >= loopState.maxMinutes) {
-        loopState.running = false;
-        break;
-      }
-
-      loopState.iteration += 1;
-
-      const { updateId, dir } = await createUpdateArtifacts(cfg.repoPath, loopState.goal);
-      loopState.lastUpdateId = updateId;
-
-      const provider = providers[DEFAULT_PROVIDER_ID];
-      const { plan, change } = await generateChangeWithLlm(loopState.goal, cfg, provider);
-      writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
-      writeFileSync(join(dir, 'change.diff'), change);
-
-      const changeHash = hash(change);
-      if (loopState.lastPatchHash && loopState.lastPatchHash === changeHash) {
-        loopState.running = false;
-        ws.send(JSON.stringify({
-          id: loopState.loopId,
-          type: 'loop.stopped',
-          ok: false,
-          error: { code: 'STAGNATION', message: 'Patch unchanged across iterations' },
-        }));
-        break;
-      }
-      loopState.lastPatchHash = changeHash;
-
-      let attempt = 0;
-      let applied = false;
-      while (attempt <= loopState.retry) {
-        try {
-          await ensureCleanTree(cfg.repoPath, git);
-          const dir = updateDir(cfg.repoPath, updateId);
-          const changePath = join(dir, 'change.diff');
-          const changeText = readFileSync(changePath, 'utf8');
-
-          ensureChangePathsAllowed(cfg.repoPath, changeText, cfg.safety?.allowlist, cfg.safety?.denylist);
-
-          await git.applyPatch(changeText);
-          await execa('npm', ['run', 'build'], { cwd: cfg.repoPath, stdio: 'inherit' });
-          await execa('npm', ['test'], { cwd: cfg.repoPath, stdio: 'inherit' });
-
-          await git.add('.');
-          await git.commit(`autobot(loop:${loopState.loopId}): ${updateId}`);
-          const head = await git.revparse(['HEAD']);
-
-          appendAudit({ type: 'loop.iteration.completed', loopId: loopState.loopId, updateId, commit: head });
-
-          ws.send(JSON.stringify({
-            id: loopState.loopId,
-            type: 'loop.iteration.completed',
-            ok: true,
-            payload: { updateId, commit: head, iteration: loopState.iteration },
-          }));
-
-          applied = true;
-          break;
-        } catch (e: any) {
-          await git.reset(['--hard', 'HEAD']);
-          ws.send(JSON.stringify({
-            id: loopState.loopId,
-            type: 'loop.iteration.failed',
-            ok: false,
-            error: { code: 'VERIFY_FAILED', message: String(e?.message || e) },
-            payload: { attempt },
-          }));
-          attempt += 1;
-        }
-      }
-
-      if (!applied) {
-        loopState.running = false;
-        break;
-      }
-    }
-
+    loopState.running = false;
     ws.send(JSON.stringify({
-      id: loopState?.loopId,
+      id: loopState.loopId,
       type: 'loop.stopped',
-      ok: true,
-      payload: { loopId: loopState?.loopId },
+      ok: false,
+      error: { code: 'LOOP_DISABLED', message: 'Loop mode is disabled in chat-only mode.' },
     }));
   }
 
@@ -490,10 +403,9 @@ export function startDaemon() {
         try {
           const { updateId, dir } = await createUpdateArtifacts(cfg.repoPath, updateCreate.data.payload.goal);
           const provider = providers[DEFAULT_PROVIDER_ID];
-          const { plan, change, model } = await generateChangeWithLlm(updateCreate.data.payload.goal, cfg, provider);
+          const { text, model } = await generateChangeWithLlm(updateCreate.data.payload.goal, cfg, provider);
 
-          writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
-          writeFileSync(join(dir, 'change.diff'), change);
+          writeFileSync(join(dir, 'response.txt'), text || '', 'utf8');
           appendAudit({ type: 'update.created', updateId, model });
 
           ws.send(
@@ -501,7 +413,7 @@ export function startDaemon() {
               id: updateCreate.data.id,
               type: 'update.created',
               ok: true,
-              payload: { updateId, path: dir },
+              payload: { updateId, path: dir, response: text || '' },
             })
           );
         } catch (e: any) {

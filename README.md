@@ -61,11 +61,7 @@ autobot chat
 ```
 (Type a prompt per line; `exit` to quit.)
 
-Chat generates updates and asks before applying by default.
-To auto-apply:
-```bash
-autobot chat --apply
-```
+Chat responds like a normal assistant. No plan/diff or apply steps.
 
 Safety config (optional):
 ```json

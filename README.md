@@ -81,7 +81,7 @@ LLM config (optional):
 ```json
 {
   "llm": {
-    "model": "openai-codex/gpt-5.2",
+    "model": "gpt-5.2",
     "endpoint": "https://chatgpt.com/backend-api/codex/responses"
   }
 }

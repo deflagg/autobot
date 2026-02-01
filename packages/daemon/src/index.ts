@@ -77,7 +77,7 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
   if (!provider.ensureValidToken) throw new Error('LLM provider missing ensureValidToken');
   const { accessToken } = await provider.ensureValidToken();
 
-  const model = cfg.llm?.model || 'openai-codex/gpt-5.2';
+  const model = cfg.llm?.model || 'gpt-5.2';
   const endpoint = cfg.llm?.endpoint || 'https://chatgpt.com/backend-api/codex/responses';
 
   const system = `You are Codex, based on GPT-5. You are running as a coding agent in the Codex CLI on a user's machine. Produce two artifacts: a JSON plan and a unified diff. Use the strict tags <PLAN_JSON>...</PLAN_JSON> and <CHANGE_DIFF>...</CHANGE_DIFF>. The diff must be relative to repo root.`;

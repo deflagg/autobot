@@ -49,7 +49,8 @@ const ws = new WebSocket(url);
 const id = String(Date.now());
 let chatCounter = 0;
 const chatMode = args[0] === 'chat';
-const autoApply = chatMode; // always auto-apply in chat mode
+const askApply = chatMode && args.includes('--ask');
+const autoApply = chatMode && !askApply; // default: auto-apply
 
 ws.on('open', () => {
   send(ws, { id: `${id}-auth`, type: 'auth', payload: { token: cfg.auth.token } });
@@ -173,9 +174,24 @@ ws.on('message', (data: WebSocket.RawData) => {
 
   if (msg.type === 'update.created') {
     console.log(JSON.stringify(msg.payload, null, 2));
-    if (chatMode && autoApply && msg.payload?.updateId) {
-      send(ws, { id: `${Date.now()}-${chatCounter++}`, type: 'update.apply', payload: { updateId: msg.payload.updateId } });
-      return;
+    if (chatMode && msg.payload?.updateId) {
+      const updateId = msg.payload.updateId;
+      if (askApply) {
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        rl.question('Apply this update? [y/N] ', (answer) => {
+          rl.close();
+          if (String(answer || '').trim().toLowerCase().startsWith('y')) {
+            send(ws, { id: `${Date.now()}-${chatCounter++}`, type: 'update.apply', payload: { updateId } });
+            return;
+          }
+          console.log('Skipped apply.');
+        });
+        return;
+      }
+      if (autoApply) {
+        send(ws, { id: `${Date.now()}-${chatCounter++}`, type: 'update.apply', payload: { updateId } });
+        return;
+      }
     }
     if (!chatMode) ws.close();
     return;

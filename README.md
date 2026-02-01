@@ -57,6 +57,10 @@ autobot chat
 (Type a prompt per line; `exit` to quit.)
 
 Chat automatically generates + applies + tests + commits each update.
+To confirm before apply:
+```bash
+autobot chat --ask
+```
 
 Safety config (optional):
 ```json

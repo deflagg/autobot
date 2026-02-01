@@ -103,7 +103,11 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
         payload?.response?.output_text ||
         payload?.output?.[0]?.content?.[0]?.text ||
         payload?.choices?.[0]?.message?.content ||
+        payload?.message?.content?.[0]?.text ||
+        payload?.content?.[0]?.text ||
         payload?.delta?.content ||
+        payload?.delta?.text ||
+        payload?.text ||
         '';
       if (delta) text += delta;
     }

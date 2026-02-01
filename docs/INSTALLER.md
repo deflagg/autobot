@@ -11,7 +11,7 @@ Provide a **single command**, **non-interactive** installer that provisions:
 Target command:
 
 ```bash
-curl -fsSL https://github.com/deflagg/autobot/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/deflagg/autobot/master/install.sh | bash
 ```
 
 ## Constraints

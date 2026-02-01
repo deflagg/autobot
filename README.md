@@ -15,6 +15,11 @@ A from-scratch, rethink-first personal automation agent.
 
 ## Getting started
 
+Install (Ubuntu):
+```bash
+curl -fsSL https://raw.githubusercontent.com/deflagg/autobot/master/install.sh | bash
+```
+
 ### OAuth configuration (required)
 Optional override in `~/.autobot/config.json` (defaults are built-in):
 

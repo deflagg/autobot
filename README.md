@@ -69,7 +69,7 @@ LLM config (optional):
 ```json
 {
   "llm": {
-    "model": "openai-codex/gpt-5.2-codex",
+    "model": "gpt-4.1",
     "endpoint": "https://chatgpt.com/backend-api/codex/responses"
   }
 }

@@ -95,6 +95,7 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
       instructions: system,
       input: [{ role: 'user', content: user }],
       temperature: 0.2,
+      store: false,
     }),
   });
 

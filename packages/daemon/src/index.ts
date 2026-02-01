@@ -43,13 +43,6 @@ async function createUpdateArtifacts(repoPath: string, goal: string) {
   return { updateId, dir };
 }
 
-function extractBetween(text: string, start: string, end: string): string | null {
-  const s = text.indexOf(start);
-  const e = text.indexOf(end);
-  if (s === -1 || e === -1 || e <= s) return null;
-  return text.slice(s + start.length, e).trim();
-}
-
 async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadConfig>, provider: AuthProvider) {
   if (!provider.ensureValidToken) throw new Error('LLM provider missing ensureValidToken');
   const { accessToken } = await provider.ensureValidToken();
@@ -57,8 +50,8 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
   const model = cfg.llm?.model || 'gpt-5.2';
   const endpoint = cfg.llm?.endpoint || 'https://chatgpt.com/backend-api/codex/responses';
 
-  const system = `You are Codex, based on GPT-5. You are running as a coding agent in the Codex CLI on a user's machine. Produce two artifacts: a JSON plan and a unified diff. Use the strict tags <PLAN_JSON>...</PLAN_JSON> and <CHANGE_DIFF>...</CHANGE_DIFF>. The diff must be relative to repo root.`;
-  const user = `Goal: ${goal}`;
+  const system = `You are a helpful assistant in a chat. Respond directly to the user's prompt.`;
+  const user = goal;
 
   const resp = await fetch(endpoint, {
     method: 'POST',
@@ -115,12 +108,7 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
       if (delta) text += delta;
     }
   }
-  const planRaw = extractBetween(text, '<PLAN_JSON>', '</PLAN_JSON>');
-  const changeRaw = extractBetween(text, '<CHANGE_DIFF>', '</CHANGE_DIFF>');
-  if (!planRaw || !changeRaw) throw new Error('LLM output missing plan or change');
-
-  const plan = JSON.parse(planRaw);
-  return { plan, change: changeRaw, model };
+  return { text, model };
 }
 
 export function startDaemon() {
@@ -374,10 +362,9 @@ export function startDaemon() {
         try {
           const { updateId, dir } = await createUpdateArtifacts(cfg.repoPath, updateCreate.data.payload.goal);
           const provider = providers[DEFAULT_PROVIDER_ID];
-          const { plan, change, model } = await generateChangeWithLlm(updateCreate.data.payload.goal, cfg, provider);
+          const { text, model } = await generateChangeWithLlm(updateCreate.data.payload.goal, cfg, provider);
 
-          writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
-          writeFileSync(join(dir, 'change.diff'), change);
+          writeFileSync(join(dir, 'response.txt'), text || '', 'utf8');
           appendAudit({ type: 'update.created', updateId, model });
 
           ws.send(
@@ -385,7 +372,7 @@ export function startDaemon() {
               id: updateCreate.data.id,
               type: 'update.created',
               ok: true,
-              payload: { updateId, path: dir },
+              payload: { updateId, path: dir, response: text || '' },
             })
           );
         } catch (e: any) {

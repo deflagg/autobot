@@ -9,7 +9,7 @@ const DEFAULTS = {
   redirectHost: '127.0.0.1',
   redirectPort: 1455,
   redirectPath: '/auth/callback',
-  scopes: 'openid profile email offline_access api.responses.write api.responses.read',
+  scopes: 'openid profile email offline_access',
 };
 const EXTRA_AUTH_PARAMS = {
   id_token_add_organizations: 'true',

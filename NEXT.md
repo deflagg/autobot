@@ -1,9 +1,9 @@
 # Next
 
 ## P0 (now)
+- [ ] Verify auth login on a clean config (no oauth overrides) with auth-profiles.json.
+- [ ] Validate Codex endpoint request/response shape end-to-end.
 - [ ] Re-run tests/build as needed.
-- [ ] Verify auth login on a clean config (no oauth overrides).
-- [ ] Confirm daemon PID lock behavior in docs.
 - [ ] Decide whether to keep chat as MVP UX or optional.
 
 ## P1

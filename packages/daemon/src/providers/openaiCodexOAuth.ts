@@ -88,24 +88,7 @@ async function exchangeCodeForTokens(params: { tokenUrl: string; clientId: strin
   return json;
 }
 
-async function refreshTokens(params: { tokenUrl: string; clientId: string; refreshToken: string }) {
-  const body = new URLSearchParams({
-    grant_type: 'refresh_token',
-    refresh_token: params.refreshToken,
-    client_id: params.clientId,
-  });
-
-  const resp = await fetch(params.tokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-
-  const json = await resp.json();
-  if (!resp.ok) throw new Error('Token refresh failed');
-  return json;
-}
-
+// refresh handled by TokenProvider
 function buildAuthorizeUrl(cfg: ReturnType<typeof getConfig>, state: string, pkce: { challenge: string; method: 'S256' }, redirectUri: string) {
   const url = new URL(cfg.authorizeUrl);
   url.searchParams.set('response_type', 'code');
@@ -117,6 +100,17 @@ function buildAuthorizeUrl(cfg: ReturnType<typeof getConfig>, state: string, pkc
   url.searchParams.set('code_challenge_method', pkce.method);
   Object.entries(EXTRA_AUTH_PARAMS).forEach(([k, v]) => url.searchParams.set(k, v));
   return url.toString();
+}
+
+function parseAccountId(token: string): string | null {
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+    return payload.account_id || payload.sub || payload.user_id || null;
+  } catch {
+    return null;
+  }
 }
 
 export function createOpenAICodexOAuthProvider(cfg: any, events: ProviderEvents = {}) {
@@ -181,7 +175,7 @@ export function createOpenAICodexOAuthProvider(cfg: any, events: ProviderEvents 
               access: json.access_token,
               refresh: json.refresh_token,
               expires: computeExpires(json.expires_in),
-              accountId: null,
+              accountId: parseAccountId(json.access_token),
               createdAt: Date.now(),
               scopes: String(c.scopes).split(/\s+/).filter(Boolean),
             };
@@ -246,7 +240,7 @@ export function createOpenAICodexOAuthProvider(cfg: any, events: ProviderEvents 
             access: json.access_token,
             refresh: json.refresh_token,
             expires: computeExpires(json.expires_in),
-            accountId: null,
+            accountId: parseAccountId(json.access_token),
             createdAt: Date.now(),
             scopes: String(getConfig(cfg).scopes).split(/\s+/).filter(Boolean),
           };

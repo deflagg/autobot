@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, openSync, closeSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { loadOAuthTokens } from './auth.js';
 
 export type AuthProfile = {
   provider: 'openai-codex';
@@ -33,10 +34,42 @@ export function ensureStateDir() {
   mkdirSync(stateDir(), { recursive: true });
 }
 
+function maybeImportLegacy(): AuthProfilesFile | null {
+  const legacy = loadOAuthTokens();
+  if (!legacy) return null;
+  if (!legacy.access_token) return null;
+  const obtainedAt = legacy.obtained_at ?? Date.now();
+  const expiresIn = legacy.expires_in ?? 3600;
+  const expires = obtainedAt + expiresIn * 1000 - 120_000;
+
+  const file: AuthProfilesFile = {
+    profiles: {
+      'openai-codex:default': {
+        provider: 'openai-codex',
+        type: 'oauth',
+        access: legacy.access_token,
+        refresh: legacy.refresh_token ?? '',
+        expires,
+        accountId: null,
+        createdAt: obtainedAt,
+        scopes: legacy.scope ? String(legacy.scope).split(/\s+/).filter(Boolean) : undefined,
+      },
+    },
+  };
+  return file;
+}
+
 export function loadAuthProfiles(): AuthProfilesFile {
   ensureStateDir();
   const p = authProfilesPath();
-  if (!existsSync(p)) return { profiles: {} };
+  if (!existsSync(p)) {
+    const imported = maybeImportLegacy();
+    if (imported) {
+      saveAuthProfiles(imported);
+      return imported;
+    }
+    return { profiles: {} };
+  }
   return JSON.parse(readFileSync(p, 'utf8')) as AuthProfilesFile;
 }
 

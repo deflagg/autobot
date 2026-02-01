@@ -14,8 +14,8 @@ v0.1 core implementation complete (Iterations 0–8). Now hardening OAuth/auth a
 - Audit logging utilities
 
 ## In progress
-- Provider-based auth implementation (Iterations A–D complete)
-- Added daemon PID lock to prevent port collisions
+- Auth storage migrated to auth-profiles.json (token sink + lock)
+- Codex endpoint integration hardening (response parsing, defaults)
 - End-to-end auth login verified (event-based + loopback)
 - Chat loop + safety allowlist/denylist added
 - Renamed patch artifacts to change (no fallback)

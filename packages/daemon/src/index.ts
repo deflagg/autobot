@@ -87,6 +87,7 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Accept: 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
@@ -100,9 +101,14 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
   });
 
   const json = await resp.json();
-  if (!resp.ok) throw new Error(`LLM request failed: ${json?.error?.message || resp.statusText}`);
+  if (!resp.ok) throw new Error(`LLM request failed: ${json?.error?.message || json?.error || resp.statusText}`);
 
-  const text = json?.output_text || json?.output?.[0]?.content?.[0]?.text || '';
+  const text =
+    json?.output_text ||
+    json?.response?.output_text ||
+    json?.output?.[0]?.content?.[0]?.text ||
+    json?.choices?.[0]?.message?.content ||
+    '';
   const planRaw = extractBetween(text, '<PLAN_JSON>', '</PLAN_JSON>');
   const changeRaw = extractBetween(text, '<CHANGE_DIFF>', '</CHANGE_DIFF>');
   if (!planRaw || !changeRaw) throw new Error('LLM output missing plan or change');

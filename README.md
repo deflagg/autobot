@@ -38,6 +38,7 @@ autobot auth login
 ```
 
 Note: only one login can be in-flight at a time. The daemon will reuse the existing session if a login is already running.
+Tokens are stored locally at `~/.autobot/auth-profiles.json` (treat like a password).
 
 Check status:
 ```bash

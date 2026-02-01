@@ -20,6 +20,11 @@ Install (Ubuntu):
 curl -fsSL https://raw.githubusercontent.com/deflagg/autobot/master/install.sh | bash
 ```
 
+Uninstall:
+```bash
+curl -fsSL https://raw.githubusercontent.com/deflagg/autobot/master/uninstall.sh | bash
+```
+
 ### OAuth configuration (required)
 Optional override in `~/.autobot/config.json` (defaults are built-in):
 

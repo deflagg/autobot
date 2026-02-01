@@ -47,7 +47,7 @@ export const CONFIG_DEFAULTS: AutobotConfig = {
   ws: { port: 18790 },
   auth: { token: 'dev-token' },
   llm: {
-    model: 'gpt-4.1',
+    model: 'openai-codex/gpt-5.2-codex',
     endpoint: 'https://chatgpt.com/backend-api/codex/responses',
   },
   safety: {

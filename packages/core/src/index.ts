@@ -8,6 +8,8 @@ export * from './updates.js';
 export * from './safety.js';
 export * from './audit.js';
 export * from './providers.js';
+export * from './authStore.js';
+export * from './tokenProvider.js';
 
 export const ConfigSchema = z.object({
   repoPath: z.string(),
@@ -46,7 +48,7 @@ export const CONFIG_DEFAULTS: AutobotConfig = {
   auth: { token: 'dev-token' },
   llm: {
     model: 'gpt-4.1',
-    endpoint: 'https://api.openai.com/v1/responses',
+    endpoint: 'https://chatgpt.com/backend-api/codex/responses',
   },
   safety: {
     denylist: ['.git/**', '.env', '*.pem', '*.key', '**/*token*', '**/*credentials*'],

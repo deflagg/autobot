@@ -19,7 +19,7 @@ v0.1 core implementation complete (Iterations 0–8). Now hardening OAuth/auth a
 - End-to-end auth login verified (event-based + loopback)
 - Chat loop + safety allowlist/denylist added
 - Renamed patch artifacts to change (no fallback)
-- LLM integration stubbed into update.create (direct HTTP, no SDK)
+- LLM integration wired into update.create/loop (direct HTTP, no SDK)
 
 ## Next (top 5)
 See `NEXT.md`.

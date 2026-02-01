@@ -78,17 +78,17 @@ ws.on('message', (data: WebSocket.RawData) => {
       return;
     }
     if (args[0] === 'auth' && args[1] === 'login') {
-      const providerId = getProviderId(args) || 'openai-codex-oauth';
+      const providerId = getProviderId(args) || 'openai-codex';
       send(ws, { id, type: 'auth.login.start', payload: { providerId } });
       return;
     }
     if (args[0] === 'auth' && args[1] === 'status') {
-      const providerId = getProviderId(args) || 'openai-codex-oauth';
+      const providerId = getProviderId(args) || 'openai-codex';
       send(ws, { id, type: 'auth.status.get', payload: { providerId } });
       return;
     }
     if (args[0] === 'auth' && args[1] === 'complete') {
-      const providerId = getProviderId(args) || 'openai-codex-oauth';
+      const providerId = getProviderId(args) || 'openai-codex';
       const first = args[2];
       const second = args[3];
       if (!first) {

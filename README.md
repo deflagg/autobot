@@ -70,7 +70,7 @@ LLM config (optional):
 {
   "llm": {
     "model": "gpt-4.1",
-    "endpoint": "https://api.openai.com/v1/responses"
+    "endpoint": "https://chatgpt.com/backend-api/codex/responses"
   }
 }
 ```

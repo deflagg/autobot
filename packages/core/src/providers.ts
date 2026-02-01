@@ -27,7 +27,7 @@ export interface AuthProvider {
   ensureValidToken?: () => Promise<{ accessToken: string }>;
 }
 
-export const DEFAULT_PROVIDER_ID = 'openai-codex-oauth';
+export const DEFAULT_PROVIDER_ID = 'openai-codex';
 export const PROVIDER_IDS = [DEFAULT_PROVIDER_ID];
 
 export function isProviderId(value: string): boolean {

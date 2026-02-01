@@ -1,0 +1,338 @@
+Alright, agent—here’s the **detailed, minimalistic implementation plan** to add **Codex subscription sign-in (ChatGPT OAuth)** to this project so **no user-supplied OpenAI API key is needed** (and we **do not** call the OpenAI Platform API-key endpoint). We’ll follow the same shape documented by OpenClaw and the Codex CLI flow. ([OpenClaw][1])
+
+---
+
+## Non-negotiables (read first)
+
+1. **No API key required from the user.** Do not add UX that asks for `OPENAI_API_KEY`, `CODEX_API_KEY`, or anything “paste your key.” We are implementing **ChatGPT OAuth subscription auth**. ([OpenAI Developers][2])
+2. **We are not using the OpenAI Platform API-key endpoint.** For Codex “ChatGPT login,” the Responses endpoint is `https://chatgpt.com/backend-api/codex/responses`. Do not send model requests to `https://api.openai.com/v1/responses`. ([OpenAI][3])
+3. **Token storage must be local, file-based, minimal.** We’ll implement an OpenClaw-like “token sink” so refresh token churn doesn’t randomly log the user out. ([OpenClaw][1])
+
+---
+
+## Target UX (minimal)
+
+We expose **one auth provider**: `openai-codex` (Codex subscription login).
+
+### CLI surface (minimum set)
+
+* `autobot auth login openai-codex`
+* `autobot auth status`
+* `autobot auth logout`
+
+No “create developer portal app,” no “client id prompt.” The user experience should match: “run login → browser opens → success → tokens stored.” ([OpenAI Developers][2])
+
+---
+
+## Architecture (4 tiny modules)
+
+Keep it dead-simple. Four modules, no framework dependency.
+
+### 1) `AuthStore` (token sink + atomic read/write + lock)
+
+Responsibilities:
+
+* Own the canonical JSON file `auth-profiles.json`
+* Provide atomic writes (write temp + rename)
+* Provide a **file lock** for refresh/login so concurrent requests don’t stomp tokens
+* Provide “profile selection” (for now: only `openai-codex:default`)
+
+OpenClaw’s rationale: some OAuth providers invalidate older refresh tokens when a new one is minted; a single “token sink” reduces chaos. ([OpenClaw][1])
+
+### 2) `OpenAICodexOAuth` (PKCE + browser login + callback listener + paste fallback)
+
+Responsibilities:
+
+* Generate PKCE verifier/challenge and state
+* Start a loopback callback server on **127.0.0.1:1455**
+* Open the authorize URL in the user’s browser
+* Capture the redirect `code` and `state`
+* Exchange code for `{access, refresh, expires}` at token endpoint
+* Extract/stash `accountId` (best-effort) like OpenClaw does ([OpenClaw][1])
+
+### 3) `TokenProvider` (getValidAccessToken + refresh)
+
+Responsibilities:
+
+* Load profile from `AuthStore`
+* If token is near expiry, refresh automatically under lock
+* Return a valid access token (or throw a clear error instructing re-login)
+
+OpenClaw behavior: “if expired → refresh under a file lock and overwrite stored credentials.” ([OpenClaw][1])
+
+### 4) `CodexResponsesClient` (HTTP to Codex Responses endpoint)
+
+Responsibilities:
+
+* Send Responses requests to `https://chatgpt.com/backend-api/codex/responses`
+* Attach `Authorization: Bearer <access_token>`
+* Handle SSE streaming (server-sent events) if your agent uses streaming
+
+Endpoint difference is explicitly documented: ChatGPT login uses the ChatGPT backend Responses endpoint. ([OpenAI][3])
+
+---
+
+## File layout + state directory
+
+### State dir
+
+* Default: `~/.autobot/` (or your project name)
+* Override: `AUTOBOT_STATE_DIR` env var (OpenClaw has a similar override concept). ([OpenClaw][1])
+
+### Files
+
+* `~/.autobot/auth-profiles.json`  ← canonical token sink
+* `~/.autobot/auth.json` (optional) ← derived runtime cache; safe to omit for MVP
+* `~/.autobot/auth.lock`           ← lock file (or use OS-level flock)
+
+OpenClaw’s storage pattern (per-agent) is the model: auth profiles + runtime cache + legacy import file. ([OpenClaw][1])
+
+---
+
+## Data model
+
+Use one profile id: `openai-codex:default`.
+
+`auth-profiles.json`:
+
+* `provider`: `"openai-codex"`
+* `type`: `"oauth"`
+* `access`: string
+* `refresh`: string
+* `expires`: epoch millis
+* `accountId`: string | null
+* `createdAt`: epoch millis
+* `scopes`: string[] (optional; useful for debug)
+
+OpenAI’s own docs warn that cached auth files contain tokens and must be treated like a password. We must print a similar warning once on login success. ([OpenAI Developers][2])
+
+---
+
+## OAuth flow details (implement exactly this)
+
+OpenClaw documents the **exact shape** we want (PKCE, callback on 1455, token endpoint). ([OpenClaw][1])
+
+### Constants (centralize in one file)
+
+* `AUTHORIZATION_ENDPOINT = "https://auth.openai.com/oauth/authorize"`
+* `TOKEN_ENDPOINT = "https://auth.openai.com/oauth/token"` ([OpenClaw][1])
+* `REDIRECT_URI = "http://localhost:1455/auth/callback"` ([OpenClaw][1])
+* `CALLBACK_BIND = "127.0.0.1"`
+* `CALLBACK_PORT = 1455`
+
+### Authorize URL query params
+
+We want “Codex CLI compatibility.” This exact shape shows up in Codex CLI output (including client_id and flags): ([GitHub][4])
+
+* `response_type=code`
+* `client_id=app_EMoamEEZ73f0CkXaXp7hrann`  *(Codex CLI public client id as seen in CLI output)* ([GitHub][5])
+* `redirect_uri=http://localhost:1455/auth/callback`
+* `scope=openid profile email offline_access`
+* `code_challenge=<base64url(sha256(verifier))>`
+* `code_challenge_method=S256`
+* `state=<random hex or base64url>`
+* `id_token_add_organizations=true`
+* `codex_cli_simplified_flow=true`
+* optionally: `originator=codex_cli_rs` (safe to omit; keep configurable) ([GitHub][4])
+
+> **Important note to agent:** This client_id/flags are *observed* from Codex CLI behavior in OpenAI’s Codex repo issues (not from the formal docs). Keep them in a config file so we can swap them if OpenAI changes the flow. ([GitHub][5])
+
+### Step-by-step login procedure
+
+1. **Generate PKCE + state**
+
+   * `code_verifier`: 32–64 random bytes → base64url
+   * `code_challenge`: base64url(sha256(code_verifier))
+   * `state`: 16–32 random bytes → hex/base64url
+
+2. **Start local callback server**
+
+   * Bind: `127.0.0.1:1455` only (never 0.0.0.0)
+   * Route: `GET /auth/callback`
+   * Validate:
+
+     * `state` matches
+     * `code` exists
+   * On success: respond with a tiny HTML page: “Authenticated. You can close this tab.”
+   * Shut down server after one success
+
+   Both OpenClaw and Codex docs rely on a localhost callback; OpenAI docs explicitly mention networking can block this callback in some environments. ([OpenClaw][1])
+
+3. **Open the authorize URL**
+
+   * Use system browser opener (`open`, `start`, `xdg-open`)
+   * Also print the URL to stdout in case auto-open fails
+
+4. **Fallback: paste redirect URL/code**
+   If the callback cannot bind or the user is remote/headless, OpenClaw’s documented fallback is “paste the redirect URL/code.” ([OpenClaw][1])
+   Implement:
+
+   * If bind fails **or** timeout occurs (e.g., 3 minutes), prompt:
+
+     * “Paste the final redirected URL from your browser”
+   * Parse `code` + `state` from the pasted URL
+   * Validate `state`
+
+5. **Token exchange**
+   POST `application/x-www-form-urlencoded` to `https://auth.openai.com/oauth/token` with: ([OpenClaw][1])
+
+   * `grant_type=authorization_code`
+   * `client_id=...`
+   * `redirect_uri=http://localhost:1455/auth/callback`
+   * `code=<code from callback>`
+   * `code_verifier=<original verifier>`
+
+   Expected response (typical OAuth): `access_token`, `refresh_token`, `expires_in` (names may vary; parse defensively).
+
+6. **Compute expiry**
+
+   * `expires_at = now + expires_in*1000 - 120_000` (2 minute safety buffer)
+   * Store `expires` as epoch millis
+
+7. **Extract accountId (best-effort)**
+   OpenClaw stores `accountId` extracted from the access token. ([OpenClaw][1])
+   Implementation:
+
+   * If access token looks like JWT (`a.b.c`), base64url-decode payload, parse JSON
+   * Candidate fields: `account_id`, `sub`, `user_id`
+   * If none exist, store `null` (don’t fail login)
+
+8. **Persist profile**
+   Write/replace `openai-codex:default` under `auth-profiles.json` atomically.
+
+9. **Print security warning once**
+   OpenAI docs: treat cached token files like passwords; do not share/commit. ([OpenAI Developers][2])
+
+---
+
+## Refresh flow (must be automatic)
+
+Refresh requirements are explicitly called out by OpenClaw: use expiry timestamp; refresh under a file lock; overwrite stored credentials. ([OpenClaw][1])
+
+### `TokenProvider.getValidAccessToken()`
+
+Algorithm:
+
+1. Load profile `openai-codex:default`
+2. If missing → throw `NotAuthenticatedError` with instructions: `autobot auth login openai-codex`
+3. If `expires > now + 5min` → return `access`
+4. Else refresh under lock:
+
+   * Acquire lock
+   * Re-read file (another process may have refreshed)
+   * If still expiring → refresh token
+   * Write updated profile atomically
+   * Release lock
+5. Return `access`
+
+### Refresh request
+
+POST form-encoded to `https://auth.openai.com/oauth/token` with:
+
+* `grant_type=refresh_token`
+* `refresh_token=<stored refresh>`
+* `client_id=<same client id>`
+
+If refresh fails:
+
+* Mark profile invalid (or delete it) and prompt re-login.
+
+---
+
+## Model request integration (no API-key endpoint)
+
+When authenticated via ChatGPT login, the Codex Responses endpoint is:
+`https://chatgpt.com/backend-api/codex/responses` ([OpenAI][3])
+
+### `CodexResponsesClient`
+
+* Before each call: `token = TokenProvider.getValidAccessToken()`
+* Send:
+
+  * `Authorization: Bearer ${token}`
+  * `Content-Type: application/json`
+* Handle:
+
+  * 401/403 → attempt **one** refresh + retry
+  * Still failing → surface “auth expired, re-login”
+* Streaming:
+
+  * If your agent uses streaming, parse SSE (“data: {...}”) similar to how the Responses API streams. (The endpoint implements Responses semantics; the blog describes SSE behavior in detail.) ([OpenAI][3])
+
+---
+
+## Headless / remote environments (minimal but real)
+
+OpenAI docs explicitly describe why localhost callback can fail (remote/headless, blocked localhost callback), and provide fallbacks. ([OpenAI Developers][2])
+
+Implement as **documentation + one fallback path**:
+
+1. **Built-in paste fallback** (already above) — works anywhere. ([OpenClaw][1])
+2. Print **SSH port-forward** instructions (no extra code):
+
+   * `ssh -L 1455:localhost:1455 user@remote`
+   * Then run `autobot auth login openai-codex` inside that SSH session
+     This mirrors Codex docs guidance. ([OpenAI Developers][2])
+3. Optional future improvement (not required for MVP): **device code auth**. OpenAI calls it preferred for headless when enabled. ([OpenAI Developers][2])
+
+---
+
+## Security rules (must implement)
+
+1. **Never log tokens.** Redact `access`, `refresh`, `code`, `code_verifier` in logs/errors.
+2. **File permissions:** create auth files with 0600 on Unix.
+3. **Bind callback server to 127.0.0.1 only.**
+4. **State validation is mandatory** (reject mismatched state).
+
+OpenAI explicitly warns that `~/.codex/auth.json` contains access tokens and must be treated like a password; we should display a similar warning for our store. ([OpenAI Developers][2])
+
+---
+
+## Tests (MVP-level but non-toy)
+
+### Unit tests
+
+* PKCE generation: deterministic test vectors
+* State mismatch → rejects callback
+* AuthStore atomic write: temp file + rename; corrupted JSON recovery
+* Refresh lock: two concurrent refresh attempts → only one hits network
+
+### Integration tests (with mock servers)
+
+* Mock OAuth server:
+
+  * `/oauth/authorize` → redirect with `code` and `state`
+  * `/oauth/token` → returns `access_token`, `refresh_token`, `expires_in`
+* Mock Responses server:
+
+  * require `Authorization: Bearer`
+  * return SSE stream or JSON
+
+### Acceptance tests (manual)
+
+* `auth login` works on desktop machine
+* `auth status` shows expiry countdown
+* Token auto-refresh works after forcing expiry
+* Requests go to `chatgpt.com/backend-api/codex/responses` (not `api.openai.com`) ([OpenAI][3])
+
+---
+
+## “Definition of Done” (what you must deliver)
+
+* A user can run **one command** (`autobot auth login openai-codex`), sign in in browser, and immediately use the agent.
+* Tokens persist locally in `auth-profiles.json`.
+* No API key prompt exists anywhere in the codepath.
+* Requests authenticate via bearer token and hit **`https://chatgpt.com/backend-api/codex/responses`**. ([OpenAI][3])
+* Headless users can complete login via paste mode and/or SSH port forwarding instructions. ([OpenAI Developers][2])
+
+---
+
+### One small reality-check (so we don’t build fantasyware)
+
+Even though we’re not using an **OpenAI Platform API key**, we are still calling an HTTP API—the **Codex Responses endpoint**—using OAuth bearer tokens returned by ChatGPT login. That’s exactly how Codex “ChatGPT login” is described. ([OpenAI Developers][2])
+
+[1]: https://docs.openclaw.ai/concepts/oauth "OAuth - OpenClaw"
+[2]: https://developers.openai.com/codex/auth/ "Authentication"
+[3]: https://openai.com/index/unrolling-the-codex-agent-loop/ "Unrolling the Codex agent loop | OpenAI"
+[4]: https://github.com/openai/codex/issues/7184 "Infinite Model response Hanging · Issue #7184 · openai/codex · GitHub"
+[5]: https://github.com/openai/codex/issues/1023 "Sign in with ChatGPT does not work (windows wsl) · Issue #1023 · openai/codex · GitHub"

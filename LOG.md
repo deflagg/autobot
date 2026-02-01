@@ -21,8 +21,9 @@
 - Cleaned test artifacts (dist outputs, temp files) and reset config to defaults.
 - Added chat loop + safety allowlist/denylist; smoke test passed.
 - Renamed patch artifacts to change (no fallback).
-- LLM generation wired into update.create (direct HTTP, no SDK).
+- LLM generation wired into update.create/loop (direct HTTP, no SDK).
 - Build ran clean.
+- Started auth refactor toward auth-design.txt token sink + Codex endpoint (in progress).
 
 ## 2026-01-30
 - Initialized repository scaffold: README/STATUS/NEXT/HANDOFF/DECISIONS/LOG.

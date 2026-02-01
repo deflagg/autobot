@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { randomBytes, createHash } from 'node:crypto';
-import { loadOAuthTokens, saveOAuthTokens, isRefreshable, isExpired } from '@autobot/core';
+import { loadAuthProfiles, saveAuthProfiles, withAuthLock, AuthProfile } from '@autobot/core';
+import { getValidAccessToken, OPENAI_CODEX_PROFILE_ID } from '@autobot/core';
 
 const BUILTIN_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const DEFAULTS = {
@@ -60,11 +61,11 @@ type PendingSession = {
 
 let pending: PendingSession | null = null;
 
-function withExpiry(payload: any) {
-  const obtainedAt = payload.obtained_at ?? Date.now();
-  const expiresIn = payload.expires_in;
-  const expiresAt = typeof expiresIn === 'number' ? obtainedAt + expiresIn * 1000 : undefined;
-  return { ...payload, obtained_at: obtainedAt, expires_at: expiresAt };
+function computeExpires(expiresIn: number | undefined) {
+  const now = Date.now();
+  const ei = expiresIn ?? 3600;
+  // 2 minute buffer
+  return now + ei * 1000 - 120_000;
 }
 
 async function exchangeCodeForTokens(params: { tokenUrl: string; clientId: string; code: string; verifier: string; redirectUri: string }) {
@@ -120,7 +121,7 @@ function buildAuthorizeUrl(cfg: ReturnType<typeof getConfig>, state: string, pkc
 
 export function createOpenAICodexOAuthProvider(cfg: any, events: ProviderEvents = {}) {
   return {
-    id: 'openai-codex-oauth',
+    id: 'openai-codex',
     async startLogin() {
       const c = getConfig(cfg);
       const redirectUri = `http://${c.redirectHost}:${c.redirectPort}${c.redirectPath}`;
@@ -172,15 +173,21 @@ export function createOpenAICodexOAuthProvider(cfg: any, events: ProviderEvents 
             redirectUri,
           });
 
-          saveOAuthTokens(
-            withExpiry({
-              access_token: json.access_token,
-              refresh_token: json.refresh_token,
-              expires_in: json.expires_in,
-              token_type: json.token_type,
-              scope: json.scope,
-            })
-          );
+          await withAuthLock(async () => {
+            const file = loadAuthProfiles();
+            const profile: AuthProfile = {
+              provider: 'openai-codex',
+              type: 'oauth',
+              access: json.access_token,
+              refresh: json.refresh_token,
+              expires: computeExpires(json.expires_in),
+              accountId: null,
+              createdAt: Date.now(),
+              scopes: String(c.scopes).split(/\s+/).filter(Boolean),
+            };
+            file.profiles[OPENAI_CODEX_PROFILE_ID] = profile;
+            saveAuthProfiles(file);
+          });
 
           res.writeHead(200).end('Login complete. You can close this tab.');
           events.onLoginComplete?.();
@@ -231,15 +238,21 @@ export function createOpenAICodexOAuthProvider(cfg: any, events: ProviderEvents 
           redirectUri: pending.redirectUri,
         });
 
-        saveOAuthTokens(
-          withExpiry({
-            access_token: json.access_token,
-            refresh_token: json.refresh_token,
-            expires_in: json.expires_in,
-            token_type: json.token_type,
-            scope: json.scope,
-          })
-        );
+        await withAuthLock(async () => {
+          const file = loadAuthProfiles();
+          const profile: AuthProfile = {
+            provider: 'openai-codex',
+            type: 'oauth',
+            access: json.access_token,
+            refresh: json.refresh_token,
+            expires: computeExpires(json.expires_in),
+            accountId: null,
+            createdAt: Date.now(),
+            scopes: String(getConfig(cfg).scopes).split(/\s+/).filter(Boolean),
+          };
+          file.profiles[OPENAI_CODEX_PROFILE_ID] = profile;
+          saveAuthProfiles(file);
+        });
 
         pending.server?.close();
         pending = null;
@@ -252,39 +265,19 @@ export function createOpenAICodexOAuthProvider(cfg: any, events: ProviderEvents 
 
     async ensureValidToken() {
       const c = getConfig(cfg);
-      const tokens = loadOAuthTokens();
-      if (!tokens) throw new Error('No OAuth tokens configured');
-
-      if (isExpired(tokens) && isRefreshable(tokens)) {
-        const json = await refreshTokens({
-          tokenUrl: c.tokenUrl,
-          clientId: c.clientId,
-          refreshToken: tokens.refresh_token as string,
-        });
-
-        const next = withExpiry({
-          access_token: json.access_token,
-          refresh_token: json.refresh_token ?? tokens.refresh_token,
-          expires_in: json.expires_in,
-          token_type: json.token_type,
-          scope: json.scope ?? tokens.scope,
-        });
-
-        saveOAuthTokens(next);
-        return { accessToken: next.access_token };
-      }
-
-      return { accessToken: tokens.access_token };
+      const accessToken = await getValidAccessToken({ clientId: c.clientId });
+      return { accessToken };
     },
 
     async getStatus() {
-      const tokens: any = loadOAuthTokens();
+      const file = loadAuthProfiles();
+      const p = file.profiles[OPENAI_CODEX_PROFILE_ID];
       return {
-        providerId: 'openai-codex-oauth',
-        configured: !!tokens,
-        refreshable: isRefreshable(tokens),
-        expired: isExpired(tokens),
-        expiresAt: tokens?.expires_at ?? null,
+        providerId: 'openai-codex',
+        configured: !!p,
+        refreshable: !!p?.refresh,
+        expired: p ? p.expires <= Date.now() : false,
+        expiresAt: p?.expires ?? null,
       };
     },
   };

@@ -9,9 +9,6 @@ import {
   UpdateCreateSchema,
   UpdateApplySchema,
   UpdateRollbackSchema,
-  LoopStartSchema,
-  LoopStatusSchema,
-  LoopStopSchema,
 } from '@autobot/protocol';
 import {
   loadConfig,
@@ -26,7 +23,6 @@ import {
 import type { AuthProvider } from '@autobot/core';
 import { stateDir } from '@autobot/core';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { ulid } from 'ulid';
 import { createOpenAICodexOAuthProvider } from './providers/openaiCodexOAuth.js';
 import { join } from 'node:path';
@@ -34,21 +30,6 @@ import { simpleGit } from 'simple-git';
 import { execa } from 'execa';
 
 const start = Date.now();
-
-type LoopState = {
-  loopId: string;
-  goal: string;
-  running: boolean;
-  iteration: number;
-  retry: number;
-  maxIterations?: number;
-  maxMinutes?: number;
-  startedAt: number;
-  lastUpdateId?: string;
-  lastPatchHash?: string;
-};
-
-let loopState: LoopState | null = null;
 
 async function createUpdateArtifacts(repoPath: string, goal: string) {
   const updateId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${ulid()}`;
@@ -60,10 +41,6 @@ async function createUpdateArtifacts(repoPath: string, goal: string) {
   writeFileSync(join(dir, 'request.json'), JSON.stringify(request, null, 2));
 
   return { updateId, dir };
-}
-
-function hash(str: string) {
-  return createHash('sha256').update(str).digest('hex');
 }
 
 function extractBetween(text: string, start: string, end: string): string | null {
@@ -80,8 +57,8 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
   const model = cfg.llm?.model || 'gpt-5.2';
   const endpoint = cfg.llm?.endpoint || 'https://chatgpt.com/backend-api/codex/responses';
 
-  const system = `You are a helpful assistant in a chat. Respond directly to the user's prompt.`;
-  const user = goal;
+  const system = `You are Codex, based on GPT-5. You are running as a coding agent in the Codex CLI on a user's machine. Produce two artifacts: a JSON plan and a unified diff. Use the strict tags <PLAN_JSON>...</PLAN_JSON> and <CHANGE_DIFF>...</CHANGE_DIFF>. The diff must be relative to repo root.`;
+  const user = `Goal: ${goal}`;
 
   const resp = await fetch(endpoint, {
     method: 'POST',
@@ -138,7 +115,12 @@ async function generateChangeWithLlm(goal: string, cfg: ReturnType<typeof loadCo
       if (delta) text += delta;
     }
   }
-  return { text, model };
+  const planRaw = extractBetween(text, '<PLAN_JSON>', '</PLAN_JSON>');
+  const changeRaw = extractBetween(text, '<CHANGE_DIFF>', '</CHANGE_DIFF>');
+  if (!planRaw || !changeRaw) throw new Error('LLM output missing plan or change');
+
+  const plan = JSON.parse(planRaw);
+  return { plan, change: changeRaw, model };
 }
 
 export function startDaemon() {
@@ -189,17 +171,6 @@ export function startDaemon() {
   };
   const wss = new WebSocketServer({ host: '127.0.0.1', port: cfg.ws.port });
   const git = simpleGit(cfg.repoPath);
-
-  async function runLoop(ws: import('ws').WebSocket) {
-    if (!loopState) return;
-    loopState.running = false;
-    ws.send(JSON.stringify({
-      id: loopState.loopId,
-      type: 'loop.stopped',
-      ok: false,
-      error: { code: 'LOOP_DISABLED', message: 'Loop mode is disabled in chat-only mode.' },
-    }));
-  }
 
   wss.on('connection', (ws: import('ws').WebSocket) => {
     let authed = false;
@@ -403,9 +374,10 @@ export function startDaemon() {
         try {
           const { updateId, dir } = await createUpdateArtifacts(cfg.repoPath, updateCreate.data.payload.goal);
           const provider = providers[DEFAULT_PROVIDER_ID];
-          const { text, model } = await generateChangeWithLlm(updateCreate.data.payload.goal, cfg, provider);
+          const { plan, change, model } = await generateChangeWithLlm(updateCreate.data.payload.goal, cfg, provider);
 
-          writeFileSync(join(dir, 'response.txt'), text || '', 'utf8');
+          writeFileSync(join(dir, 'plan.json'), JSON.stringify(plan, null, 2));
+          writeFileSync(join(dir, 'change.diff'), change);
           appendAudit({ type: 'update.created', updateId, model });
 
           ws.send(
@@ -413,7 +385,7 @@ export function startDaemon() {
               id: updateCreate.data.id,
               type: 'update.created',
               ok: true,
-              payload: { updateId, path: dir, response: text || '' },
+              payload: { updateId, path: dir },
             })
           );
         } catch (e: any) {
@@ -495,50 +467,6 @@ export function startDaemon() {
             })
           );
         }
-        return;
-      }
-
-      const loopStart = LoopStartSchema.safeParse(msg);
-      if (loopStart.success) {
-        const loopId = ulid();
-        loopState = {
-          loopId,
-          goal: loopStart.data.payload.goal,
-          running: true,
-          iteration: 0,
-          retry: loopStart.data.payload.retry ?? 1,
-          maxIterations: loopStart.data.payload.maxIterations,
-          maxMinutes: loopStart.data.payload.maxMinutes,
-          startedAt: Date.now(),
-        };
-
-        ws.send(JSON.stringify({ id: loopStart.data.id, type: 'loop.started', ok: true, payload: { loopId } }));
-        runLoop(ws);
-        return;
-      }
-
-      const loopStatus = LoopStatusSchema.safeParse(msg);
-      if (loopStatus.success) {
-        ws.send(JSON.stringify({
-          id: loopStatus.data.id,
-          type: 'loop.status.result',
-          ok: true,
-          payload: loopState
-            ? {
-                loopId: loopState.loopId,
-                state: loopState.running ? 'running' : 'stopped',
-                iteration: loopState.iteration,
-                lastUpdateId: loopState.lastUpdateId,
-              }
-            : { loopId: null, state: 'stopped' },
-        }));
-        return;
-      }
-
-      const loopStop = LoopStopSchema.safeParse(msg);
-      if (loopStop.success && loopState && loopState.loopId === loopStop.data.payload.loopId) {
-        loopState.running = false;
-        ws.send(JSON.stringify({ id: loopStop.data.id, type: 'loop.stopped', ok: true, payload: { loopId: loopState.loopId } }));
         return;
       }
 
